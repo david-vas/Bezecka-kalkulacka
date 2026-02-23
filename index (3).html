@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TýmDejvid · Pace Calculator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;800;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #0d0d0d; color: #e8e8e8; font-family: 'Barlow', sans-serif; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+    .app {
+      min-height: 100vh; background: #0d0d0d;
+      background-image:
+        radial-gradient(ellipse 70% 50% at 5% 5%, rgba(180,255,0,.05) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 70% at 95% 95%, rgba(180,255,0,.03) 0%, transparent 55%);
+    }
+    .hdr { display:flex; align-items:center; gap:14px; padding:0 24px; height:58px; background:#111; border-bottom:1px solid #1c1c1c; position:sticky; top:0; z-index:50; }
+    .hdr-badge { width:32px; height:32px; border-radius:7px; background:#b4ff00; display:flex; align-items:center; justify-content:center; font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:14px; color:#0d0d0d; }
+    .hdr-title { font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:19px; letter-spacing:1px; }
+    .hdr-sub { font-size:10px; color:#3a3a3a; letter-spacing:2px; text-transform:uppercase; margin-top:-2px; }
+    .tabs { display:flex; background:#111; border-bottom:1px solid #1c1c1c; padding:0 24px; overflow-x:auto; }
+    .tab { padding:12px 18px; background:none; border:none; border-bottom:2px solid transparent; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#363636; cursor:pointer; white-space:nowrap; transition:color .15s,border-color .15s; }
+    .tab:hover { color:#888; }
+    .tab.on { color:#b4ff00; border-bottom-color:#b4ff00; }
+    .pg { padding:32px 24px; max-width:820px; margin:0 auto; }
+    .pg-h { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:28px; letter-spacing:.5px; line-height:1; }
+    .pg-s { font-size:11px; color:#363636; letter-spacing:2px; text-transform:uppercase; margin:3px 0 28px; }
+    .card { background:#131313; border:1px solid #1c1c1c; border-radius:14px; padding:26px 28px; margin-bottom:14px; }
+    .card-lbl { font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:#333; margin-bottom:22px; font-weight:600; }
+    .card-lbl span { color:#b4ff00; }
+    .big-display { display:flex; align-items:baseline; gap:0; flex-wrap:wrap; margin-bottom:28px; line-height:1; }
+    .big-num { font-family:'Barlow Condensed',sans-serif; font-weight:300; font-size:88px; color:#f0f0f0; letter-spacing:-2px; line-height:.92; }
+    .big-unit { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:22px; color:#333; margin-left:4px; margin-right:16px; align-self:flex-end; padding-bottom:10px; }
+    .big-num.accent { color:#b4ff00; }
+    .slider-block { margin-bottom:18px; }
+    .slider-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .slider-name { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11px; letter-spacing:2.5px; text-transform:uppercase; color:#444; }
+    .slider-val { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px; color:#b4ff00; letter-spacing:1px; }
+    input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:2px; border-radius:1px; background:#222; outline:none; cursor:pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%; background:#b4ff00; border:3px solid #0d0d0d; box-shadow:0 0 0 1px #b4ff00,0 0 14px rgba(180,255,0,.35); cursor:pointer; transition:box-shadow .15s; }
+    input[type=range]::-webkit-slider-thumb:hover { box-shadow:0 0 0 1px #b4ff00,0 0 22px rgba(180,255,0,.55); }
+    input[type=range]::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:#b4ff00; border:3px solid #0d0d0d; box-shadow:0 0 0 1px #b4ff00,0 0 14px rgba(180,255,0,.35); cursor:pointer; }
+    .rgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:10px; margin-top:18px; }
+    .rbox { background:#181818; border:1px solid #1c1c1c; border-radius:10px; padding:14px; transition:border-color .15s,background .15s; }
+    .rbox:hover { border-color:#b4ff00; background:rgba(180,255,0,.04); }
+    .rbox-lbl { font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#383838; margin-bottom:5px; }
+    .rbox-val { font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:26px; color:#e8e8e8; }
+    .rbox-val.g { color:#b4ff00; }
+    .rbox-val em { font-style:normal; font-size:13px; color:#383838; margin-left:3px; }
+    .race-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:10px; margin-top:16px; }
+    .splits-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:10px; margin-top:16px; }
+    .race-card,.split-card { background:#181818; border:1px solid #1c1c1c; border-radius:10px; padding:14px; transition:border-color .15s; }
+    .race-card:hover,.split-card:hover { border-color:#b4ff00; }
+    .race-dist { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:18px; color:#b4ff00; }
+    .race-time { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:26px; color:#e8e8e8; margin:3px 0; }
+    .race-pace { font-size:11px; color:#383838; letter-spacing:.8px; }
+    .split-dist { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:#888; margin-bottom:6px; font-family:'Barlow Condensed',sans-serif; font-weight:600; }
+    .split-time { font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:22px; color:#e8e8e8; }
+    .ztable { width:100%; border-collapse:collapse; }
+    .zrow { border-bottom:1px solid #191919; transition:background .12s; }
+    .zrow:hover { background:rgba(180,255,0,.03); }
+    .zrow td { padding:11px 8px; font-size:13px; }
+    .znum { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:20px; width:34px; }
+    .zname { color:#aaa; font-size:12px; }
+    .zpace { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px; text-align:right; white-space:nowrap; }
+    .zbar { width:80px; padding-right:10px; }
+    .zbar-bg { background:#1e1e1e; border-radius:3px; height:4px; overflow:hidden; }
+    .zbar-fill { height:100%; border-radius:3px; }
+    .tag { display:inline-block; background:rgba(180,255,0,.08); border:1px solid rgba(180,255,0,.2); color:#b4ff00; border-radius:4px; padding:2px 8px; font-size:10px; letter-spacing:1px; text-transform:uppercase; font-weight:600; }
+    .btn-grp { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+    .btn { background:#181818; color:#444; border:1px solid #222; border-radius:8px; padding:9px 20px; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:12px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:all .15s; }
+    .btn:hover { border-color:#b4ff00; color:#e8e8e8; }
+    .btn.on { background:#b4ff00; color:#0d0d0d; border-color:#b4ff00; }
+    .divider { height:1px; background:#1c1c1c; margin:20px 0; }
+    @media(max-width:500px) { .big-num{font-size:64px;} .pg{padding:22px 16px;} .card{padding:20px 18px;} }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState } = React;
+
+    const p2 = n => String(Math.round(n)).padStart(2, "0");
+
+    function toHMS(s) {
+      if (!s || s <= 0) return "--:--";
+      const h  = Math.floor(s / 3600);
+      const m  = Math.floor((s % 3600) / 60);
+      const sc = Math.round(s % 60);
+      return h > 0 ? `${h}:${p2(m)}:${p2(sc)}` : `${m}:${p2(sc)}`;
+    }
+
+    function riegel(d1, t1, d2) { return t1 * Math.pow(d2 / d1, 1.06); }
+
+    function Slider({ label, value, min, max, step = 1, unit, onChange }) {
+      const pct = ((value - min) / (max - min)) * 100;
+      return (
+        <div className="slider-block">
+          <div className="slider-row">
+            <span className="slider-name">// {label}</span>
+            <span className="slider-val">{value} {unit}</span>
+          </div>
+          <input
+            type="range" min={min} max={max} step={step} value={value}
+            onChange={e => onChange(Number(e.target.value))}
+            style={{ background: `linear-gradient(to right, #b4ff00 ${pct}%, #1e1e1e ${pct}%)` }}
+          />
+        </div>
+      );
+    }
+
+    function PaceCard({ pm, ps, setPm, setPs, label = "TEMPO (min / km)" }) {
+      return (
+        <div className="card">
+          <div className="card-lbl">// <span>{label}</span></div>
+          <div className="big-display">
+            <span className="big-num accent">{p2(pm)}</span>
+            <span className="big-unit">MIN</span>
+            <span className="big-num">{p2(ps)}</span>
+            <span className="big-unit">S</span>
+          </div>
+          <Slider label="MINUTY"  value={pm} min={1} max={15} unit="min" onChange={setPm} />
+          <Slider label="SEKUNDY" value={ps} min={0} max={59} unit="s"   onChange={setPs} />
+        </div>
+      );
+    }
+
+    const RACES = [
+      { label:"1 km",       dist:1000 },
+      { label:"1 míle",     dist:1609.34 },
+      { label:"3 km",       dist:3000 },
+      { label:"5 km",       dist:5000 },
+      { label:"10 km",      dist:10000 },
+      { label:"Půlmaraton", dist:21097.5 },
+      { label:"Maraton",    dist:42195 },
+      { label:"50 km",      dist:50000 },
+      { label:"100 km",     dist:100000 },
+    ];
+
+    const SPLITS = [
+      { label:"100 m",  dist:100 },
+      { label:"200 m",  dist:200 },
+      { label:"300 m",  dist:300 },
+      { label:"400 m",  dist:400 },
+      { label:"600 m",  dist:600 },
+      { label:"800 m",  dist:800 },
+      { label:"1 km",   dist:1000 },
+      { label:"1 míle", dist:1609.34 },
+    ];
+
+    const ZONES = [
+      { num:1,  name:"Volné výklusy (regenerace)",      from:"04:38", to:"05:23", color:"#4fc3f7" },
+      { num:2,  name:"Volné běhy — long, kopce",        from:"04:07", to:"04:38", color:"#29b6f6" },
+      { num:3,  name:"Dlouhé běhy (rovina)",            from:"03:42", to:"04:07", color:"#26c6da" },
+      { num:4,  name:"Tempové běhy 20–30' (maraton)",   from:"03:33", to:"03:42", color:"#66bb6a" },
+      { num:5,  name:"Tempové běhy 10–15' (půlka)",     from:"03:20", to:"03:33", color:"#b4ff00" },
+      { num:6,  name:"Tempo desítky (2 km)",            from:"03:12", to:"03:20", color:"#d4e157" },
+      { num:7,  name:"Tempo desítky až pětky (1 km)",   from:"03:03", to:"03:12", color:"#ffca28" },
+      { num:8,  name:"Tempo pětky (400/600 m)",         from:"02:59", to:"03:03", color:"#ffa726" },
+      { num:9,  name:"Tempo trojky (200 m)",            from:"02:51", to:"02:59", color:"#ef5350" },
+      { num:10, name:"Rovinky (šprinty)",               from:"02:26", to:"02:51", color:"#b71c1c" },
+    ];
+
+    const ZF = [
+      [1.4,1.63],[1.24,1.4],[1.115,1.24],[1.07,1.115],[1.0,1.07],
+      [0.967,1.0],[0.917,0.967],[0.9,0.917],[0.858,0.9],[0.74,0.858],
+    ];
+
+    function ConvertTab({ pm, ps, setPm, setPs }) {
+      const tot = pm * 60 + ps;
+      const kph = tot ? (3600 / tot).toFixed(2) : "–";
+      const mps = tot ? (1000 / tot).toFixed(2) : "–";
+      const [kphVal, setKphVal] = useState(14.4);
+      const paceRevSec = kphVal > 0 ? 3600 / kphVal : 0;
+      return (
+        <div>
+          <div className="pg-h">TEMPO → RYCHLOST</div>
+          <div className="pg-s">Přepočet min/km ↔ km/h</div>
+          <PaceCard pm={pm} ps={ps} setPm={setPm} setPs={setPs} label="TEMPO (min / km)" />
+          <div className="rgrid">
+            <div className="rbox"><div className="rbox-lbl">Rychlost</div><div className="rbox-val g">{kph}<em>km/h</em></div></div>
+            <div className="rbox"><div className="rbox-lbl">m/s</div><div className="rbox-val">{mps}<em>m/s</em></div></div>
+            <div className="rbox"><div className="rbox-lbl">Tempo / míle</div><div className="rbox-val">{toHMS(tot * 1.60934)}<em>min/mi</em></div></div>
+            <div className="rbox"><div className="rbox-lbl">Tempo min/km</div><div className="rbox-val g">{pm}:{p2(ps)}<em>min/km</em></div></div>
+          </div>
+          <div className="card" style={{marginTop:14}}>
+            <div className="card-lbl">// <span>ZPĚT: km/h → tempo</span></div>
+            <div className="big-display">
+              <span className="big-num accent">{kphVal.toFixed(1)}</span>
+              <span className="big-unit">KM/H</span>
+            </div>
+            <Slider label="RYCHLOST" value={kphVal} min={5} max={30} step={0.1} unit="km/h" onChange={v => setKphVal(parseFloat(parseFloat(v).toFixed(1)))} />
+            <div className="divider" />
+            <div className="rgrid" style={{marginTop:0}}>
+              <div className="rbox"><div className="rbox-lbl">Tempo min/km</div><div className="rbox-val g">{toHMS(paceRevSec)}</div></div>
+              <div className="rbox"><div className="rbox-lbl">Tempo min/míle</div><div className="rbox-val">{toHMS(paceRevSec * 1.60934)}</div></div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function SplitsTab({ pm, ps, setPm, setPs }) {
+      const tot = pm * 60 + ps;
+      return (
+        <div>
+          <div className="pg-h">SPLITY & ÚSEKY</div>
+          <div className="pg-s">Časy na 100 m – 1 míli</div>
+          <PaceCard pm={pm} ps={ps} setPm={setPm} setPs={setPs} />
+          <div className="splits-grid">
+            {SPLITS.map(d => (
+              <div className="split-card" key={d.label}>
+                <div className="split-dist">{d.label}</div>
+                <div className="split-time">{toHMS(tot * d.dist / 1000)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function RacesTab({ pm, ps, setPm, setPs }) {
+      const [mode, setMode] = useState("pace");
+      const tot = pm * 60 + ps;
+      const [ridx, setRidx] = useState(4);
+      const [rH, setRH] = useState(0);
+      const [rM, setRM] = useState(38);
+      const [rS, setRS] = useState(0);
+      const refSec = rH * 3600 + rM * 60 + rS;
+      return (
+        <div>
+          <div className="pg-h">ZÁVODNÍ ČASY</div>
+          <div className="pg-s">Predikce z tempa nebo Riegelova vzorce</div>
+          <div className="btn-grp">
+            <button className={`btn${mode==="pace"?" on":""}`}   onClick={()=>setMode("pace")}>Z tempa</button>
+            <button className={`btn${mode==="riegel"?" on":""}`} onClick={()=>setMode("riegel")}>Riegel predikce</button>
+          </div>
+          {mode === "pace" ? (
+            <>
+              <PaceCard pm={pm} ps={ps} setPm={setPm} setPs={setPs} />
+              <div className="race-grid">
+                {RACES.map(d => (
+                  <div className="race-card" key={d.label}>
+                    <div className="race-dist">{d.label}</div>
+                    <div className="race-time">{toHMS(tot * d.dist / 1000)}</div>
+                    <div className="race-pace">{pm}:{p2(ps)} min/km</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="card">
+              <div className="card-lbl">// <span>REFERENČNÍ VÝSLEDEK</span></div>
+              <div style={{marginBottom:20}}>
+                <div style={{fontSize:10,letterSpacing:2.5,textTransform:"uppercase",color:"#333",marginBottom:10,fontWeight:600}}>// VZDÁLENOST</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {RACES.map((d,i) => (
+                    <button key={d.label} className={`btn${ridx===i?" on":""}`}
+                      style={{padding:"6px 12px",fontSize:11}} onClick={()=>setRidx(i)}>{d.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="big-display">
+                <span className="big-num accent">{p2(rH)}</span><span className="big-unit">H</span>
+                <span className="big-num">{p2(rM)}</span><span className="big-unit">MIN</span>
+                <span className="big-num">{p2(rS)}</span><span className="big-unit">S</span>
+              </div>
+              <Slider label="HODINY"  value={rH} min={0} max={12} unit="h"   onChange={setRH} />
+              <Slider label="MINUTY"  value={rM} min={0} max={59} unit="min" onChange={setRM} />
+              <Slider label="SEKUNDY" value={rS} min={0} max={59} unit="s"   onChange={setRS} />
+              <div style={{marginTop:10}}><span className="tag">Riegelův vzorec</span><span style={{fontSize:11,color:"#333",marginLeft:8}}>T₂ = T₁ × (D₂/D₁)^1.06</span></div>
+              <div className="race-grid" style={{marginTop:16}}>
+                {RACES.filter((_,i)=>i!==ridx).map(d => {
+                  const pred = riegel(RACES[ridx].dist, refSec, d.dist);
+                  const pace = pred / (d.dist / 1000);
+                  return (
+                    <div className="race-card" key={d.label}>
+                      <div className="race-dist">{d.label}</div>
+                      <div className="race-time">{toHMS(pred)}</div>
+                      <div className="race-pace">{toHMS(pace)} min/km</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function ZonesTab({ pm, ps, setPm, setPs }) {
+      const thr = pm * 60 + ps;
+      const dyn = ZONES.map((z, i) => ({
+        ...z,
+        fromSec: thr * ZF[i][0],
+        toSec:   thr * ZF[i][1],
+      }));
+      return (
+        <div>
+          <div className="pg-h">TRÉNINKOVÉ ZÓNY</div>
+          <div className="pg-s">Dynamické zóny · TýmDejvid</div>
+          <PaceCard pm={pm} ps={ps} setPm={setPm} setPs={setPs} label="PRAHOVÉ TEMPO = ZÓNA 5" />
+          <div className="card">
+            <table className="ztable">
+              <thead>
+                <tr>
+                  {["#","Název","Rozsah min/km",""].map((h,i)=>(
+                    <td key={i} style={{padding:"6px 8px",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#282828",textAlign:i===2?"right":"left"}}>{h}</td>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dyn.map((z,i)=>(
+                  <tr className="zrow" key={z.num}>
+                    <td className="znum" style={{color:z.color}}>{z.num}</td>
+                    <td className="zname">{z.name}</td>
+                    <td className="zpace">
+                      <span style={{color:"#444"}}>{toHMS(z.fromSec)}</span>
+                      <span style={{color:"#2a2a2a",margin:"0 6px"}}>–</span>
+                      <span style={{color:"#d0d0d0"}}>{toHMS(z.toSec)}</span>
+                    </td>
+                    <td className="zbar">
+                      <div className="zbar-bg">
+                        <div className="zbar-fill" style={{width:`${10+i*10}%`,background:z.color}}/>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="card" style={{background:"transparent",border:"1px solid #181818"}}>
+            <div style={{marginBottom:14}}><span className="tag">Fixní zóny TýmDejvid</span></div>
+            <table className="ztable">
+              <tbody>
+                {ZONES.map(z=>(
+                  <tr className="zrow" key={z.num}>
+                    <td className="znum" style={{color:z.color}}>{z.num}</td>
+                    <td className="zname">{z.name}</td>
+                    <td className="zpace">
+                      <span style={{color:"#444"}}>{z.from}</span>
+                      <span style={{color:"#2a2a2a",margin:"0 6px"}}>–</span>
+                      <span style={{color:"#d0d0d0"}}>{z.to}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    const GOAL_DISTS = [
+      { label:"1 km",       dist:1000 },
+      { label:"3 km",       dist:3000 },
+      { label:"5 km",       dist:5000 },
+      { label:"10 km",      dist:10000 },
+      { label:"Půlmaraton", dist:21097.5 },
+      { label:"Maraton",    dist:42195 },
+      { label:"Vlastní",    dist:null },
+    ];
+
+    function GoalTab() {
+      const [gH,  setGH]  = useState(1);
+      const [gM,  setGM]  = useState(36);
+      const [gS,  setGS]  = useState(0);
+      const [didx, setDidx] = useState(4);
+      const [customKm, setCustomKm] = useState(10);
+      const [splitEvery, setSplitEvery] = useState(1);
+      const [splitType, setSplitType] = useState("even");
+
+      const totalSec = gH * 3600 + gM * 60 + gS;
+      const distM    = GOAL_DISTS[didx].dist ?? customKm * 1000;
+      const distKm   = distM / 1000;
+      const paceSec  = distKm > 0 && totalSec > 0 ? totalSec / distKm : 0;
+      const kph      = paceSec > 0 ? (3600 / paceSec).toFixed(2) : "–";
+
+      const checkpoints = [];
+      for (let k = splitEvery; k < distKm; k += splitEvery) {
+        checkpoints.push(parseFloat(k.toFixed(4)));
+      }
+      checkpoints.push(parseFloat(distKm.toFixed(4)));
+
+      function segmentPace(segStart, segEnd) {
+        if (splitType === "even") return paceSec;
+        // Plynulý přechod: lineární interpolace od +1% na začátku do -1% na konci (negative)
+        const segMid = (segStart + segEnd) / 2;
+        const progress = segMid / distKm; // 0 = start, 1 = cíl
+        const factor = splitType === "negative"
+          ? 1.01 - progress * 0.02   // začíná +1%, končí -1%
+          : 0.99 + progress * 0.02;  // začíná -1%, končí +1%
+        return paceSec * factor;
+      }
+
+      return (
+        <div>
+          <div className="pg-h">CÍLOVÝ ČAS</div>
+          <div className="pg-s">Zadej čas + vzdálenost → výsledné tempo</div>
+
+          <div className="card">
+            <div className="card-lbl">// <span>VZDÁLENOST</span></div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:GOAL_DISTS[didx].dist===null?16:0}}>
+              {GOAL_DISTS.map((d,i) => (
+                <button key={d.label} className={`btn${didx===i?" on":""}`}
+                  style={{padding:"8px 14px",fontSize:12}} onClick={()=>setDidx(i)}>{d.label}</button>
+              ))}
+            </div>
+            {GOAL_DISTS[didx].dist === null && (
+              <div style={{marginTop:16}}>
+                <div className="big-display">
+                  <span className="big-num accent">{customKm.toFixed(1)}</span>
+                  <span className="big-unit">KM</span>
+                </div>
+                <Slider label="VZDÁLENOST" value={customKm} min={0.1} max={200} step={0.1} unit="km" onChange={v => setCustomKm(parseFloat(parseFloat(v).toFixed(1)))} />
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-lbl">// <span>CÍLOVÝ ČAS</span></div>
+            <div className="big-display">
+              <span className="big-num accent">{p2(gH)}</span><span className="big-unit">H</span>
+              <span className="big-num">{p2(gM)}</span><span className="big-unit">MIN</span>
+              <span className="big-num">{p2(gS)}</span><span className="big-unit">S</span>
+            </div>
+            <Slider label="HODINY"  value={gH} min={0} max={24} unit="h"   onChange={setGH} />
+            <Slider label="MINUTY"  value={gM} min={0} max={59} unit="min" onChange={setGM} />
+            <Slider label="SEKUNDY" value={gS} min={0} max={59} unit="s"   onChange={setGS} />
+          </div>
+
+          {paceSec > 0 && (
+            <>
+              <div className="card" style={{border:"1px solid rgba(180,255,0,.25)",background:"rgba(180,255,0,.04)"}}>
+                <div className="card-lbl">// <span>VÝSLEDNÉ TEMPO</span></div>
+                <div className="big-display" style={{marginBottom:8}}>
+                  <span className="big-num accent">{Math.floor(paceSec/60)}</span>
+                  <span className="big-unit">MIN</span>
+                  <span className="big-num accent">{p2(Math.round(paceSec%60))}</span>
+                  <span className="big-unit">S / KM</span>
+                </div>
+                <div className="rgrid" style={{marginTop:16}}>
+                  <div className="rbox"><div className="rbox-lbl">Rychlost</div><div className="rbox-val g">{kph}<em>km/h</em></div></div>
+                  <div className="rbox"><div className="rbox-lbl">Vzdálenost</div><div className="rbox-val">{distKm%1===0?distKm:distKm.toFixed(2)}<em>km</em></div></div>
+                  <div className="rbox"><div className="rbox-lbl">Cílový čas</div><div className="rbox-val">{toHMS(totalSec)}</div></div>
+                  <div className="rbox"><div className="rbox-lbl">Tempo / míle</div><div className="rbox-val">{toHMS(paceSec*1.60934)}<em>min/mi</em></div></div>
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="card-lbl">// <span>NASTAVENÍ MEZIČASŮ</span></div>
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#444",marginBottom:8,fontWeight:600}}>Interval</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    {[1,5,10].map(v => (
+                      <button key={v} className={`btn${splitEvery===v?" on":""}`}
+                        style={{padding:"8px 18px"}} onClick={()=>setSplitEvery(v)}>každý {v} km</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#444",marginBottom:8,fontWeight:600}}>Typ rozložení</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <button className={`btn${splitType==="even"?" on":""}`}     style={{padding:"8px 14px"}} onClick={()=>setSplitType("even")}>⚡ Even split</button>
+                    <button className={`btn${splitType==="negative"?" on":""}`} style={{padding:"8px 14px"}} onClick={()=>setSplitType("negative")}>📈 Negative split</button>
+                    <button className={`btn${splitType==="positive"?" on":""}`} style={{padding:"8px 14px"}} onClick={()=>setSplitType("positive")}>📉 Positive split</button>
+                  </div>
+                  {splitType !== "even" && (
+                    <div style={{marginTop:10,fontSize:11,color:"#555"}}>
+                      {splitType==="negative"
+                        ? "1. polovina ~1% pomalejší → 2. polovina ~1% rychlejší"
+                        : "1. polovina ~1% rychlejší → 2. polovina ~1% pomalejší"}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {checkpoints.length > 0 && (
+                <div className="card">
+                  <div className="card-lbl">// <span>MEZIČASY</span></div>
+                  <table className="ztable">
+                    <thead>
+                      <tr>
+                        <td style={{padding:"6px 10px",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#333",width:80}}>Km</td>
+                        <td style={{padding:"6px 10px",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#333",textAlign:"right"}}>Úsek</td>
+                        <td style={{padding:"6px 10px",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#333",textAlign:"right"}}>Celkem</td>
+                        <td style={{padding:"6px 10px",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#333",textAlign:"right"}}>Tempo</td>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        let cumSec = 0;
+                        let prevKm = 0;
+                        return checkpoints.map((km) => {
+                          const segKm = km - prevKm;
+                          const sp = segmentPace(prevKm, km);
+                          const segSec = sp * segKm;
+                          cumSec += segSec;
+                          const isLast = Math.abs(km - distKm) < 0.001 && distKm % splitEvery !== 0;
+                          const label = isLast ? distKm.toFixed(2)+" km" : km+" km";
+                          const result = (
+                            <tr className="zrow" key={km}>
+                              <td style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:16,color:"#b4ff00"}}>{label}</td>
+                              <td style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:17,color:"#e8e8e8",textAlign:"right"}}>{toHMS(segSec)}</td>
+                              <td style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:17,color:"#aaa",textAlign:"right"}}>{toHMS(cumSec)}</td>
+                              <td style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:600,fontSize:14,
+                                color: splitType==="even" ? "#555" : (sp < paceSec ? "#b4ff00" : "#ef5350"),
+                                textAlign:"right"}}>{Math.floor(sp/60)}:{p2(Math.round(sp%60))}</td>
+                            </tr>
+                          );
+                          prevKm = km;
+                          return result;
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
+    const TABS = [
+      { id:"goal",    label:"🎯 Cílový čas" },
+      { id:"splits",  label:"⏱ Splity" },
+      { id:"convert", label:"🔄 Konverze" },
+      { id:"races",   label:"🏆 Závody" },
+      { id:"zones",   label:"📊 Zóny" },
+    ];
+
+    function App() {
+      const [tab, setTab] = useState("goal");
+      const [pm, setPm]   = useState(3);
+      const [ps, setPs]   = useState(20);
+      const shared = { pm, ps, setPm, setPs };
+      return (
+        <div className="app">
+          <header className="hdr">
+            <img src="data:image/jpeg;base64,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" alt="TýmDejvid" style={{height:'48px',width:'auto',objectFit:'contain',borderRadius:'6px'}} />
+            <div style={{width:'1px',height:'30px',background:'#222',margin:'0 4px'}} />
+            <div>
+              <div className="hdr-title">PACE CALCULATOR</div>
+              <div className="hdr-sub">#TYMDEJVID · <a href="https://www.davidvas.cz" target="_blank" style={{color:"#b4ff00",textDecoration:"none"}}>davidvas.cz</a></div>
+            </div>
+          </header>
+          <nav className="tabs">
+            {TABS.map(t=>(
+              <button key={t.id} className={`tab${tab===t.id?" on":""}`} onClick={()=>setTab(t.id)}>{t.label}</button>
+            ))}
+          </nav>
+          <main className="pg">
+            {tab==="convert" && <ConvertTab  {...shared}/>}
+            {tab==="splits"  && <SplitsTab   {...shared}/>}
+            {tab==="races"   && <RacesTab    {...shared}/>}
+            {tab==="goal"    && <GoalTab />}
+            {tab==="zones"   && <ZonesTab    {...shared}/>}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
