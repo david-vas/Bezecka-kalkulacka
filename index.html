@@ -10,6 +10,13 @@
   <meta name="theme-color" content="#0d0d0d">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon.png">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -321,6 +328,153 @@
 
     function riegel(d1, t1, d2) { return t1 * Math.pow(d2 / d1, 1.06); }
 
+    // ─── Tooltip ("co je co") ────────────────────────────────
+    function Tooltip({ text, children }) {
+      const [open, setOpen] = React.useState(false);
+      const wrapRef = React.useRef(null);
+      React.useEffect(() => {
+        if (!open) return;
+        const close = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('click', close);
+        return () => document.removeEventListener('click', close);
+      }, [open]);
+      return (
+        <span ref={wrapRef} style={{position:'relative',display:'inline-flex',alignItems:'center',gap:6}}>
+          {children}
+          <button type="button"
+            onClick={(e)=>{ e.stopPropagation(); setOpen(o=>!o); }}
+            aria-label="Vysvětlení"
+            style={{width:18,height:18,borderRadius:'50%',border:'1px solid rgba(76,255,0,.4)',background:'rgba(76,255,0,.08)',color:'var(--accent)',fontSize:11,fontWeight:700,cursor:'pointer',padding:0,lineHeight:1,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>?</button>
+          {open && (
+            <span style={{position:'absolute',top:'calc(100% + 6px)',left:0,zIndex:50,maxWidth:280,minWidth:200,background:'#1a1a1a',color:'#e8e8e8',border:'1px solid rgba(76,255,0,.3)',borderRadius:8,padding:'10px 12px',fontSize:12,lineHeight:1.55,boxShadow:'0 10px 30px rgba(0,0,0,.5)',fontWeight:400,whiteSpace:'normal'}}>{text}</span>
+          )}
+        </span>
+      );
+    }
+
+    // ─── URL share helper for athletes ───────────────────────
+    function buildAthShareUrl(a) {
+      const base = (typeof window !== 'undefined' && window.location)
+        ? window.location.origin + window.location.pathname
+        : 'https://david-vas.github.io/Bezecka-kalkulacka/';
+      const params = new URLSearchParams();
+      if (a.name)  params.set('name',  a.name);
+      if (a.pmar)  params.set('pmar',  a.pmar);
+      if (a.phalf) params.set('phalf', a.phalf);
+      if (a.p10k)  params.set('p10k',  a.p10k);
+      if (a.p5k)   params.set('p5k',   a.p5k);
+      return base + '?' + params.toString();
+    }
+
+    // ─── iCal (.ics) export for countdown events ─────────────
+    function icsEscape(s) {
+      return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+    }
+    function toIcsDate(iso) {
+      // iso ~ "2026-04-12T09:30:00" (local). Treat as floating local time per ICS spec.
+      return iso.replace(/[-:]/g,'').replace(/\.\d+/,'');
+    }
+    function buildIcs(ev) {
+      const dtStart = toIcsDate(ev.iso);
+      const end = new Date(new Date(ev.iso).getTime() + 60*60*1000);
+      const pad = (n)=>String(n).padStart(2,'0');
+      const dtEnd = `${end.getFullYear()}${pad(end.getMonth()+1)}${pad(end.getDate())}T${pad(end.getHours())}${pad(end.getMinutes())}00`;
+      const uid = `tymdejvid-${ev.id}@davidvas.cz`;
+      const stamp = new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'');
+      return [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//TymDejvid//Bezecka kalkulacka//CS',
+        'CALSCALE:GREGORIAN',
+        'BEGIN:VEVENT',
+        'UID:' + uid,
+        'DTSTAMP:' + stamp,
+        'DTSTART:' + dtStart,
+        'DTEND:' + dtEnd,
+        'SUMMARY:' + icsEscape((ev.icon||'') + ' ' + ev.name),
+        'DESCRIPTION:' + icsEscape('Přidáno z TýmDejvid · Běžecká kalkulačka'),
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+    }
+    function downloadIcs(ev) {
+      const blob = new Blob([buildIcs(ev)], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (ev.name||'udalost').replace(/[^a-z0-9čďěňřšťůúýž\-_ ]/gi,'').replace(/\s+/g,'_') + '.ics';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    }
+
+    // ─── Karvonen HR zones ───────────────────────────────────
+    // zones returned as % of HRR (heart rate reserve)
+    const KARVONEN_ZONES = [
+      { num:1, name:"Regenerace",       from:0.50, to:0.60, color:"#4fc3f7", tip:"Velmi lehké, aktivní zotavení." },
+      { num:2, name:"Základní vytrvalost", from:0.60, to:0.70, color:"#29b6f6", tip:"Dlouhé pomalé běhy, aerobní základna." },
+      { num:3, name:"Aerobní tempo",    from:0.70, to:0.80, color:"#26c6da", tip:"Tempo, ve kterém ještě udržíš konverzaci." },
+      { num:4, name:"Práh / Tempo",     from:0.80, to:0.90, color:"#4cff00", tip:"Laktátový práh, tempo na ~1 hodinu závodu." },
+      { num:5, name:"VO₂ max / Anaerob", from:0.90, to:1.00, color:"#ef5350", tip:"Maximální intervaly 1–5 min." },
+    ];
+    function karvonenHR(hrMax, hrRest, pct) {
+      return Math.round((hrMax - hrRest) * pct + hrRest);
+    }
+
+    // ─── Grade Adjusted Pace (GAP) ────────────────────────────
+    // Minetti et al. — energy cost of running as function of slope.
+    // Returns multiplier vs. flat (1.0 = flat, >1 harder/slower equivalent).
+    function gapFactor(grade) {
+      // grade is rise/run (e.g. 0.05 = 5 % uphill)
+      const g = grade;
+      // Strava-style polynomial approximation of Minetti's data
+      return 15.14 * g*g*g*g - 2.896 * g*g*g + 4.503 * g*g + 0.3001 * g + 1.0;
+    }
+
+    // ─── Yasso 800s ──────────────────────────────────────────
+    // Marathon time (h:mm) → 800 m repeats target (mm:ss)
+    function yassoFromMarathon(marathonSec) {
+      // Bart Yasso's heuristic: marathon h:mm == 800 m m:ss (numerically equal, units swap).
+      const h = Math.floor(marathonSec / 3600);
+      const m = Math.floor((marathonSec % 3600) / 60);
+      return h * 60 + m; // seconds per 800 m
+    }
+    function marathonFromYasso(yasso800Sec) {
+      // Inverse: m:ss per 800 m → h:mm marathon
+      const m = Math.floor(yasso800Sec / 60);
+      const s = yasso800Sec % 60;
+      return m * 3600 + s * 60;
+    }
+
+    // ─── Treadmill ↔ Road pace ───────────────────────────────
+    // Empirical: treadmill ~ 1 % easier than road at 0 % grade due to no air resistance.
+    // Setting incline ~1 % equalizes them. Source: Jones & Doust (1996).
+    function treadmillToRoad(treadmillSec, inclinePct) {
+      // Both paces are sec/km. Higher incline → harder → equivalent road pace is faster (smaller sec/km).
+      const correction = 1 - 0.033 * inclinePct + 0.01; // -3.3 % per % grade, +1 % for missing air resistance at flat
+      return treadmillSec * Math.max(0.6, correction);
+    }
+    function roadToTreadmill(roadSec, inclinePct) {
+      const correction = 1 - 0.033 * inclinePct + 0.01;
+      return roadSec / Math.max(0.6, correction);
+    }
+
+    // ─── Temperature & humidity marathon correction ──────────
+    // Combines temperature impact (Maughan / El Helou et al.) with humidity penalty.
+    // Returns multiplicative slowdown factor (>=1.0). Ideal ~ 10–12 °C / low humidity.
+    function tempCorrection(tempC, humidityPct) {
+      const t = Number(tempC);
+      const h = Math.max(0, Math.min(100, Number(humidityPct)));
+      // Temperature: parabola with minimum at 11 °C
+      const tDelta = t - 11;
+      let tempFactor;
+      if (tDelta <= 0) tempFactor = 1 + 0.0010 * tDelta * tDelta; // colder = mild penalty
+      else             tempFactor = 1 + 0.0028 * tDelta * tDelta; // warmer = strong penalty
+      // Humidity: above 60 % adds extra cost (more at higher temps)
+      const humBase = Math.max(0, h - 60) / 100;
+      const humFactor = 1 + humBase * (0.05 + 0.005 * Math.max(0, t - 15));
+      return tempFactor * humFactor;
+    }
+
     function Slider({ label, value, min, max, step = 1, unit, onChange }) {
       const pct = ((value - min) / (max - min)) * 100;
       const [editing, setEditing] = React.useState(false);
@@ -442,6 +596,10 @@
       const mps = tot ? (1000 / tot).toFixed(2) : "–";
       const [kphVal, setKphVal] = useState(14.4);
       const paceRevSec = kphVal > 0 ? 3600 / kphVal : 0;
+      const [showTread, setShowTread] = useState(false);
+      const [treadIncline, setTreadIncline] = useState(1);
+      const roadEquivSec = treadmillToRoad(tot, treadIncline);
+      const treadEquivSec = roadToTreadmill(tot, treadIncline);
       return (
         <div>
           <div className="pg-h">TEMPO → RYCHLOST</div>
@@ -465,6 +623,34 @@
               <div className="rbox"><div className="rbox-lbl">Tempo min/km</div><div className="rbox-val g">{toHMS(paceRevSec)}</div></div>
               <div className="rbox"><div className="rbox-lbl">Tempo min/míle</div><div className="rbox-val">{toHMS(paceRevSec * 1.60934)}</div></div>
             </div>
+          </div>
+
+          {/* Treadmill ↔ Road toggle */}
+          <div style={{marginTop:14}}>
+            <button className={`btn${showTread?' on':''}`} onClick={()=>setShowTread(v=>!v)}
+              style={{width:'100%',padding:'12px 0',fontSize:13,fontWeight:700,letterSpacing:1.2,fontFamily:"'Barlow Condensed',sans-serif"}}>
+              🏃‍♂️ Běžící pás ↔ silnice {showTread ? '▲' : '▼'}
+            </button>
+            {showTread && (
+              <div className="card" style={{marginTop:10}}>
+                <div className="card-lbl">// <span>
+                  <Tooltip text="Běh na pásu je o ~1 % snazší než na silnici kvůli chybějícímu odporu vzduchu. Sklon pásu na 1 % to vyrovná. Při zadání tempa na pásu a sklonu uvidíš ekvivalentní silniční tempo (a obráceně).">
+                    BĚŽÍCÍ PÁS — ekvivalent silnice
+                  </Tooltip>
+                </span></div>
+                <div style={{fontSize:11,color:'#888',marginBottom:10,marginTop:6,lineHeight:1.6}}>
+                  Tempo zadané nahoře je <strong style={{color:'#ccc'}}>na pásu</strong> při sklonu níže — ukážeme ekvivalentní <strong style={{color:'#ccc'}}>silniční tempo</strong>.
+                </div>
+                <Slider label="SKLON PÁSU" value={treadIncline} min={0} max={15} step={0.5} unit="%" onChange={v=>setTreadIncline(parseFloat(parseFloat(v).toFixed(1)))} />
+                <div className="rgrid" style={{marginTop:6}}>
+                  <div className="rbox"><div className="rbox-lbl">Pás → silnice</div><div className="rbox-val g">{toHMS(roadEquivSec)}<em>min/km</em></div></div>
+                  <div className="rbox"><div className="rbox-lbl">Silnice → pás</div><div className="rbox-val">{toHMS(treadEquivSec)}<em>min/km</em></div></div>
+                </div>
+                <div style={{marginTop:10,padding:'10px 12px',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:8,fontSize:11,color:'#888',lineHeight:1.7}}>
+                  💡 Pro běžnou venkovní simulaci nastav sklon <strong style={{color:'#ccc'}}>1 %</strong>.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -503,6 +689,17 @@
       const [rS, setRS] = useState(0);
       const [customRaceKm, setCustomRaceKm] = useState(42.195);
       const refSec = rH * 3600 + rM * 60 + rS;
+      // Yasso 800s state
+      const [yMaraH, setYMaraH] = useState(3);
+      const [yMaraM, setYMaraM] = useState(30);
+      const [yMode, setYMode] = useState("fromMaraton"); // or "fromYasso"
+      const [yY, setYY] = useState(3);
+      const [yYS, setYYS] = useState(30);
+      // Weather correction state
+      const [showWeather, setShowWeather] = useState(false);
+      const [temp, setTemp] = useState(20);
+      const [humid, setHumid] = useState(60);
+      const wFactor = tempCorrection(temp, humid);
 
       const RACES_EXTENDED = [
         ...RACES,
@@ -513,12 +710,13 @@
       return (
         <div>
           <div className="pg-h">ZÁVODNÍ ČASY</div>
-          <div className="pg-s">Predikce z tempa nebo Riegelova vzorce</div>
+          <div className="pg-s">Predikce z tempa, Riegelova vzorce nebo Yasso 800s</div>
           <div className="btn-grp">
             <button className={`btn${mode==="pace"?" on":""}`}   onClick={()=>setMode("pace")}>Dle tempa</button>
             <button className={`btn${mode==="riegel"?" on":""}`} onClick={()=>setMode("riegel")}>Dle Riegelova vzorce</button>
+            <button className={`btn${mode==="yasso"?" on":""}`}  onClick={()=>setMode("yasso")}>Yasso 800s</button>
           </div>
-          {mode === "pace" ? (
+          {mode === "pace" && (
             <>
               <PaceCard pm={pm} ps={ps} setPm={setPm} setPs={setPs} />
               <div className="race-grid">
@@ -570,9 +768,15 @@
                 </div>
               </div>
             </>
-          ) : (
+          )}
+
+          {mode === "riegel" && (
             <div className="card">
-              <div className="card-lbl">// <span>REFERENČNÍ VÝSLEDEK</span></div>
+              <div className="card-lbl">// <span>
+                <Tooltip text="Riegel: T₂ = T₁ × (D₂/D₁)^1.06. Z jednoho známého výsledku predikujeme čas na jiných distancích. Funguje dobře od 1500 m do maratonu, u ultra se odchyluje.">
+                  REFERENČNÍ VÝSLEDEK
+                </Tooltip>
+              </span></div>
               <div style={{marginBottom:20}}>
                 <div style={{fontSize:10,letterSpacing:2.5,textTransform:"uppercase",color:"#888",marginBottom:10,fontWeight:600}}>// VZDÁLENOST</div>
                 <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -606,6 +810,115 @@
               </div>
             </div>
           )}
+
+          {mode === "yasso" && (
+            <div className="card">
+              <div className="card-lbl">// <span>
+                <Tooltip text="Yasso 800s je tréninkový test od trenéra Barta Yassa. 10× 800 m s pauzou (lehkým klusem) ve stejném čase. Když zvládneš 10 opakování po m:ss, čas tvého maratonu bude přibližně h:mm (např. 10× 3:30 → maraton 3:30 h). Heuristika, ne přesný vzorec — ale velmi populární u maratonců.">
+                  YASSO 800s — predikce maratonu
+                </Tooltip>
+              </span></div>
+              <div style={{fontSize:12,color:'#888',marginBottom:12,lineHeight:1.6}}>
+                Klasický trénink Barta Yassa: <strong style={{color:'#ccc'}}>10× 800 m</strong> s pauzou ve stejném čase. Čas opakování v <em>m:ss</em> ≈ čas maratonu v <em>h:mm</em>.
+              </div>
+              <div className="btn-grp" style={{marginBottom:14}}>
+                <button className={`btn${yMode==="fromMaraton"?" on":""}`} onClick={()=>setYMode("fromMaraton")}>Mám cíl maratonu</button>
+                <button className={`btn${yMode==="fromYasso"?" on":""}`} onClick={()=>setYMode("fromYasso")}>Mám čas 800 m</button>
+              </div>
+              {yMode === "fromMaraton" ? (
+                <>
+                  <div style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:'#666',marginBottom:8,fontWeight:700}}>// CÍLOVÝ ČAS MARATONU</div>
+                  <div className="big-display">
+                    <span className="big-num accent">{p2(yMaraH)}</span><span className="big-unit">H</span>
+                    <span className="big-num">{p2(yMaraM)}</span><span className="big-unit">MIN</span>
+                  </div>
+                  <Slider label="HODINY"  value={yMaraH} min={2} max={6}  unit="h"   onChange={setYMaraH} />
+                  <Slider label="MINUTY"  value={yMaraM} min={0} max={59} unit="min" onChange={setYMaraM} />
+                  {(() => {
+                    const ySec = yassoFromMarathon(yMaraH*3600 + yMaraM*60);
+                    const km800Pace = ySec / 0.8; // sec per km
+                    return (
+                      <div className="rgrid" style={{marginTop:14}}>
+                        <div className="rbox"><div className="rbox-lbl">Cíl 800 m</div><div className="rbox-val g">{toHMS(ySec)}<em>min:s</em></div></div>
+                        <div className="rbox"><div className="rbox-lbl">Tempo</div><div className="rbox-val">{toHMS(km800Pace)}<em>min/km</em></div></div>
+                        <div className="rbox"><div className="rbox-lbl">Trénink</div><div className="rbox-val">10×<em>opakování</em></div></div>
+                        <div className="rbox"><div className="rbox-lbl">Pauza</div><div className="rbox-val">{toHMS(ySec)}<em>klus</em></div></div>
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : (
+                <>
+                  <div style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:'#666',marginBottom:8,fontWeight:700}}>// ČAS 800 m</div>
+                  <div className="big-display">
+                    <span className="big-num accent">{p2(yY)}</span><span className="big-unit">MIN</span>
+                    <span className="big-num">{p2(yYS)}</span><span className="big-unit">S</span>
+                  </div>
+                  <Slider label="MINUTY"  value={yY}  min={2} max={6}  unit="min" onChange={setYY} />
+                  <Slider label="SEKUNDY" value={yYS} min={0} max={59} unit="s"   onChange={setYYS} />
+                  {(() => {
+                    const mSec = marathonFromYasso(yY*60 + yYS);
+                    const marPace = mSec / 42.195;
+                    return (
+                      <div className="rgrid" style={{marginTop:14}}>
+                        <div className="rbox"><div className="rbox-lbl">Predikce maratonu</div><div className="rbox-val g">{toHMS(mSec)}<em>h:mm</em></div></div>
+                        <div className="rbox"><div className="rbox-lbl">Tempo maratonu</div><div className="rbox-val">{toHMS(marPace)}<em>min/km</em></div></div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+              <div style={{marginTop:14,padding:'10px 12px',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:8,fontSize:11,color:'#888',lineHeight:1.7}}>
+                💡 <strong style={{color:'#ccc'}}>Tip:</strong> Začni 4× 800 m a každý týden přidávej jedno opakování. Cílových 10× zvládneš 2–3 týdny před závodem.
+              </div>
+            </div>
+          )}
+
+          {/* ─── Weather (temperature + humidity) correction ─── */}
+          <div style={{marginTop:14}}>
+            <button className={`btn${showWeather?' on':''}`} onClick={()=>setShowWeather(v=>!v)}
+              style={{width:'100%',padding:'12px 0',fontSize:13,fontWeight:700,letterSpacing:1.2,fontFamily:"'Barlow Condensed',sans-serif"}}>
+              🌡️ Korekce na teplotu a vlhkost {showWeather ? '▲' : '▼'}
+            </button>
+            {showWeather && (
+              <div className="card" style={{marginTop:10}}>
+                <div className="card-lbl">// <span>
+                  <Tooltip text="V horku a vlhku tělo hůř chladí → klesá výkon. Ideál pro maraton je ~10 °C a nízká vlhkost. Tato korekce násobí tvůj 'ideální' čas faktorem pro dané podmínky. Vzorec kombinuje teplotní data (Maughan, El Helou) s vlhkostí.">
+                    POČASÍ — vliv na čas
+                  </Tooltip>
+                </span></div>
+                <div style={{fontSize:11,color:'#888',marginTop:6,marginBottom:10,lineHeight:1.6}}>
+                  Vezmi cílový čas z módu „Dle tempa" a uvidíš, o kolik tě podmínky zpomalí (ideál ~ 10–12 °C, nízká vlhkost).
+                </div>
+                <Slider label="TEPLOTA"  value={temp}  min={-10} max={40}  step={1} unit="°C" onChange={setTemp} />
+                <Slider label="VLHKOST" value={humid} min={0}   max={100} step={5} unit="%"  onChange={setHumid} />
+                <div className="rgrid" style={{marginTop:10}}>
+                  <div className="rbox"><div className="rbox-lbl">Zpomalení</div><div className="rbox-val g">+{((wFactor-1)*100).toFixed(1)}<em>%</em></div></div>
+                  <div className="rbox"><div className="rbox-lbl">Faktor</div><div className="rbox-val">×{wFactor.toFixed(3)}</div></div>
+                </div>
+                <div style={{marginTop:12,padding:'10px 12px',background:'rgba(76,255,0,.05)',border:'1px solid rgba(76,255,0,.15)',borderRadius:10}}>
+                  <div style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:'#888',marginBottom:8,fontWeight:700}}>Reálný čas závodu (z tempa nahoře)</div>
+                  <div className="race-grid">
+                    {[5000, 10000, 21097.5, 42195].map(d => {
+                      const ideal = tot * d / 1000;
+                      const real  = ideal * wFactor;
+                      const lbl = d===21097.5?'Půlmaraton':d===42195?'Maraton':`${d/1000} km`;
+                      return (
+                        <div className="race-card" key={d}>
+                          <div className="race-dist">{lbl}</div>
+                          <div className="race-time">{toHMS(real)}</div>
+                          <div className="race-pace">+{toHMS(real-ideal)} ztráta</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{marginTop:10,fontSize:11,color:'#666',lineHeight:1.6}}>
+                  Empirický vzorec: minimum cca <strong style={{color:'#aaa'}}>11 °C</strong>, vlhkost nad 60 % přidává zátěž (víc v horku).
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       );
     }
@@ -617,17 +930,92 @@
         fromSec: thr * ZF[i][0],
         toSec:   thr * ZF[i][1],
       }));
+      const [zoneMode, setZoneMode] = React.useState("pace"); // "pace" or "hr"
+      const [hrMax, setHrMax]   = React.useState(190);
+      const [hrRest, setHrRest] = React.useState(55);
       return (
         <div>
           <div className="pg-h">TRÉNINKOVÉ ZÓNY</div>
-          <div className="pg-s">Dynamické zóny dle tvého prahového tempa</div>
+          <div className="pg-s">Dynamické zóny dle tempa nebo tepu (Karvonen)</div>
 
+          <div className="btn-grp">
+            <button className={`btn${zoneMode==="pace"?" on":""}`} onClick={()=>setZoneMode("pace")}>Dle tempa</button>
+            <button className={`btn${zoneMode==="hr"?" on":""}`}   onClick={()=>setZoneMode("hr")}>Dle tepu (Karvonen)</button>
+          </div>
+
+          {zoneMode === "hr" && (
+            <>
+              <div className="card" style={{borderColor:"rgba(76,255,0,.15)",marginBottom:14,marginTop:14}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:16,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:18}}>❤️</span>
+                  <Tooltip text="Karvonenův vzorec: HRzóna = (HRmax - HRrest) × % + HRrest. Bere v úvahu klidovou tepovou frekvenci a je přesnější než pouhé procento HRmax. HRmax orientačně 220 - věk, ale nejpřesněji ze závodního testu. HRrest měř ráno před vstáním.">
+                    Karvonenovy zóny
+                  </Tooltip>
+                </div>
+                <div style={{fontSize:13,color:"#666",lineHeight:1.7,maxWidth:560}}>
+                  Zadej maximální (HRmax) a klidovou (HRrest) tepovou frekvenci. Karvonen použije rezervu <strong style={{color:"#ccc"}}>HRR = HRmax − HRrest</strong> a spočítá zóny jako procenta rezervy přičtené ke klidovému tepu.
+                </div>
+              </div>
+              <div className="card">
+                <Slider label="HR MAX"  value={hrMax}  min={140} max={220} step={1} unit="tep/min" onChange={setHrMax} />
+                <Slider label="HR REST" value={hrRest} min={30}  max={90}  step={1} unit="tep/min" onChange={setHrRest} />
+                <div style={{marginTop:8,padding:"10px 12px",background:"rgba(255,255,255,.04)",borderRadius:8,fontSize:12,color:"#888"}}>
+                  HRR (rezerva) = <strong style={{color:"#ccc"}}>{Math.max(0,hrMax - hrRest)}</strong> tep/min
+                </div>
+              </div>
+              <div className="card" style={{marginTop:14}}>
+                <table className="ztable">
+                  <thead>
+                    <tr>
+                      {["#","Název","Rozsah BPM","% HRR",""].map((h,i)=>(
+                        <td key={i} style={{padding:"6px 8px",fontSize:10,letterSpacing:2,textTransform:"uppercase",color:"#666",textAlign:i===3?"right":"left"}}>{h}</td>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {KARVONEN_ZONES.map((z, i)=>{
+                      const lo = karvonenHR(hrMax, hrRest, z.from);
+                      const hi = karvonenHR(hrMax, hrRest, z.to);
+                      return (
+                        <tr className="zrow" key={z.num} title={z.tip}>
+                          <td className="znum" style={{color:z.color}}>{z.num}</td>
+                          <td>
+                            <div className="zname">{z.name}</div>
+                            <div style={{fontSize:10,color:"#777",marginTop:2}}>{z.tip}</div>
+                          </td>
+                          <td className="zpace">
+                            <span style={{color:"#888"}}>{lo}</span>
+                            <span style={{color:"#2a2a2a",margin:"0 6px"}}>–</span>
+                            <span style={{color:"#d0d0d0"}}>{hi}</span>
+                          </td>
+                          <td style={{fontSize:11,color:"#888"}}>{Math.round(z.from*100)}–{Math.round(z.to*100)}%</td>
+                          <td className="zbar">
+                            <div className="zbar-bg">
+                              <div className="zbar-fill" style={{width:`${20+i*16}%`,background:z.color}}/>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{marginTop:10,fontSize:11,color:"#666",lineHeight:1.7,padding:"0 4px"}}>
+                💡 HRmax přibližně <strong style={{color:"#aaa"}}>220 − věk</strong>, ale nejpřesněji z výkonnostního testu. HRrest měř ráno před vstáním.
+              </div>
+            </>
+          )}
+
+          {zoneMode === "pace" && <>
           {/* Vysvětlení prahového tempa */}
-          <div className="card" style={{borderColor:"rgba(76,255,0,.15)",marginBottom:14}}>
+          <div className="card" style={{borderColor:"rgba(76,255,0,.15)",marginBottom:14,marginTop:14}}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
               <div>
                 <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:16,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:18}}>💡</span> Co je prahové tempo?
+                  <span style={{fontSize:18}}>💡</span>
+                  <Tooltip text="Laktátový práh (LT2) je intenzita, při které se laktát začíná hromadit rychleji, než ho tělo stíhá odbourávat. Udržíš ji ~40–60 minut na maximum. Je to klíčová tréninková kotva — všechny ostatní zóny se od ní odvíjejí.">
+                    Co je prahové tempo?
+                  </Tooltip>
                 </div>
                 <div style={{fontSize:13,color:"#666",lineHeight:1.7,maxWidth:560}}>
                   Prahové tempo (tzv. <strong style={{color:"#ccc"}}>laktátový práh</strong>) je nejrychlejší tempo, které dokážeš udržet po dobu přibližně <strong style={{color:"#ccc"}}>40–60 minut</strong> při maximálním vypětí. Je to hranice mezi aerobním a anaerobním úsilím — tělo ještě stíhá odbourávat laktát, ale jen tak tak.
@@ -679,6 +1067,7 @@
               </tbody>
             </table>
           </div>
+          </>}
         </div>
       );
     }
@@ -1397,6 +1786,20 @@
       const [athletes, setAthletes] = React.useState(loadAthletes);
       const [editing, setEditing]   = React.useState(null); // null | "new" | athlete object
       const [form, setForm]         = React.useState({ name:"", emoji:"🏃", color:"#4fc3f7", p5k:"", p10k:"", phalf:"", pmar:"", note:"" });
+      const [sharedId, setSharedId] = React.useState(null);
+
+      async function shareAthlete(a) {
+        const url = buildAthShareUrl(a);
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: `Tempa · ${a.name}`, text: `Tempa pro ${a.name}`, url });
+          } else {
+            await navigator.clipboard.writeText(url);
+          }
+          setSharedId(a.id);
+          setTimeout(() => setSharedId(null), 1800);
+        } catch(e) {}
+      }
 
       function openNew() {
         setForm({ name:"", emoji:"🏃", color:"#4fc3f7", p5k:"", p10k:"", phalf:"", pmar:"", note:"" });
@@ -1517,8 +1920,9 @@
                       <div className="ali-paces">{paceLabel}{a.note ? " · "+a.note : ""}</div>
                     </div>
                     <div className="ali-actions" onClick={e=>e.stopPropagation()}>
-                      <button className="ali-btn" onClick={()=>openEdit(a)}>✏️</button>
-                      <button className="ali-btn del" onClick={()=>deleteAth(a.id)}>🗑</button>
+                      <button className="ali-btn" title={sharedId===a.id ? "Zkopírováno!" : "Sdílet odkaz na atleta"} onClick={()=>shareAthlete(a)}>{sharedId===a.id ? "✅" : "🔗"}</button>
+                      <button className="ali-btn" title="Upravit" onClick={()=>openEdit(a)}>✏️</button>
+                      <button className="ali-btn del" title="Smazat" onClick={()=>deleteAth(a.id)}>🗑</button>
                     </div>
                     {activeAthId===a.id && <div style={{color:"#4cff00",fontSize:16,flexShrink:0}}>✓</div>}
                   </div>
@@ -2498,8 +2902,9 @@
                       </div>
                     </div>
                     <div style={{display:'flex',gap:6}}>
-                      <button onClick={()=>startEdit(ev)} style={{width:30,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.04)',cursor:'pointer',fontSize:14,color:'#aaa'}}>✏️</button>
-                      <button onClick={()=>saveEvents(events.filter(e=>e.id!==ev.id))} style={{width:30,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.04)',cursor:'pointer',fontSize:14,color:'#aaa'}}>🗑</button>
+                      <button title="Přidat do kalendáře (.ics)" onClick={()=>downloadIcs(ev)} style={{width:30,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.04)',cursor:'pointer',fontSize:14,color:'#aaa'}}>📅</button>
+                      <button title="Upravit" onClick={()=>startEdit(ev)} style={{width:30,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.04)',cursor:'pointer',fontSize:14,color:'#aaa'}}>✏️</button>
+                      <button title="Smazat" onClick={()=>saveEvents(events.filter(e=>e.id!==ev.id))} style={{width:30,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.1)',background:'rgba(255,255,255,.04)',cursor:'pointer',fontSize:14,color:'#aaa'}}>🗑</button>
                     </div>
                   </div>
 
@@ -2550,16 +2955,87 @@
     }
 
 
+    // ─── TerrainTab (GAP — Grade Adjusted Pace) ──────────────
+    function TerrainTab({ pm, ps, setPm, setPs }) {
+      const tot = pm * 60 + ps;
+      const [distKm, setDistKm]    = React.useState(10);
+      const [gainM,  setGainM]     = React.useState(150);
+      const [lossM,  setLossM]     = React.useState(150);
+      const [avgGrade, setAvgGrade] = React.useState(2); // %, for "single slope" preview
+      // Approximation: cost = avg of factor at +grade (gain/dist) and -grade (loss/dist).
+      const upGrade   = distKm > 0 ? (gainM / 1000) / distKm : 0;
+      const downGrade = distKm > 0 ? -((lossM / 1000) / distKm) : 0;
+      // Use weighted avg by distance up vs down (rough split). For simple route, weight 50/50.
+      const fUp   = gapFactor(upGrade);
+      const fDown = gapFactor(downGrade);
+      const factor = (fUp + fDown) / 2;
+      const realPaceSec  = tot * factor;          // effort-equivalent flat pace your watch shows
+      const flatTime     = tot * distKm;          // if it were flat
+      const realTime     = realPaceSec * distKm;  // hilly time at same effort
+      const previewFactor = gapFactor(avgGrade/100);
+      return (
+        <div>
+          <div className="pg-h">TERÉN · GAP</div>
+          <div className="pg-s">Grade Adjusted Pace — ekvivalentní tempo s ohledem na převýšení</div>
+
+          <div className="card" style={{borderColor:'rgba(76,255,0,.15)',marginBottom:14}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:16,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>⛰️</span>
+              <Tooltip text="GAP (Grade Adjusted Pace) převádí tempo na členitém terénu na ekvivalentní tempo na rovině při stejné námaze. Hodinky Garmin/Suunto/Coros to počítají také. Vzorec vychází z Minettiho studie energetické náročnosti běhu do svahu.">
+                Co je GAP?
+              </Tooltip>
+            </div>
+            <div style={{fontSize:13,color:"#666",lineHeight:1.7}}>
+              Běh do kopce stojí víc energie než po rovině. GAP ti řekne, jaké <strong style={{color:'#ccc'}}>rovinné tempo</strong> by odpovídalo tvému aktuálnímu úsilí na členité trati.
+            </div>
+          </div>
+
+          <PaceCard pm={pm} ps={ps} setPm={setPm} setPs={setPs} label="ROVINNÉ TEMPO (cíl/odhad)" />
+
+          <div className="card" style={{marginTop:14}}>
+            <div className="card-lbl">// <span>PARAMETRY TRATI</span></div>
+            <Slider label="VZDÁLENOST" value={distKm} min={1}  max={100} step={0.5} unit="km" onChange={v=>setDistKm(parseFloat(parseFloat(v).toFixed(1)))} />
+            <Slider label="STOUPÁNÍ"   value={gainM}  min={0}  max={3000} step={10} unit="m"  onChange={setGainM} />
+            <Slider label="KLESÁNÍ"    value={lossM}  min={0}  max={3000} step={10} unit="m"  onChange={setLossM} />
+            <div className="rgrid" style={{marginTop:6}}>
+              <div className="rbox"><div className="rbox-lbl">Faktor terénu</div><div className="rbox-val g">×{factor.toFixed(3)}</div></div>
+              <div className="rbox"><div className="rbox-lbl">Reálné tempo</div><div className="rbox-val">{toHMS(realPaceSec)}<em>min/km</em></div></div>
+              <div className="rbox"><div className="rbox-lbl">Čas (rovina)</div><div className="rbox-val">{toHMS(flatTime)}</div></div>
+              <div className="rbox"><div className="rbox-lbl">Čas (s převýšením)</div><div className="rbox-val g">{toHMS(realTime)}</div></div>
+            </div>
+          </div>
+
+          <div className="card" style={{marginTop:14}}>
+            <div className="card-lbl">// <span>
+              <Tooltip text="Konstantní sklon — užitečné pro intervaly do kopce nebo z kopce. Kladný = stoupání, záporný = klesání.">
+                JEDNOTLIVÝ ÚSEK — sklon
+              </Tooltip>
+            </span></div>
+            <Slider label="SKLON" value={avgGrade} min={-15} max={20} step={0.5} unit="%" onChange={v=>setAvgGrade(parseFloat(parseFloat(v).toFixed(1)))} />
+            <div className="rgrid" style={{marginTop:6}}>
+              <div className="rbox"><div className="rbox-lbl">Faktor</div><div className="rbox-val g">×{previewFactor.toFixed(3)}</div></div>
+              <div className="rbox"><div className="rbox-lbl">Rovina → svah</div><div className="rbox-val">{toHMS(tot * previewFactor)}<em>min/km</em></div></div>
+              <div className="rbox"><div className="rbox-lbl">Svah → rovina (GAP)</div><div className="rbox-val">{toHMS(tot / previewFactor)}<em>min/km</em></div></div>
+            </div>
+            <div style={{marginTop:10,fontSize:11,color:"#666",lineHeight:1.7}}>
+              💡 Pro stejné úsilí běž <strong style={{color:'#ccc'}}>{previewFactor >= 1 ? 'pomaleji' : 'rychleji'}</strong> o <strong style={{color:'#ccc'}}>{toHMS(Math.abs(tot * previewFactor - tot))}</strong> /km.
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const TABS = [
       { id:"profil",  label:"👤\nProfil",      tip:"Tvůj profil · OR · tempa · boty · vše na jednom místě" },
       { id:"goal",    label:"🎯\nCílový čas",  tip:"Zadej cíl a vzdálenost → zjisti tempo" },
       { id:"splits",  label:"⏱\nMezičasy",     tip:"Mezičasy na krátké úseky (100m–1míle)" },
-      { id:"convert", label:"🔄\nPřepočet",    tip:"Převod min/km ↔ km/h ↔ m/s" },
-      { id:"races",   label:"🏆\nZávody",      tip:"Závodní predikce z tempa nebo výsledku" },
-      { id:"zones",   label:"📊\nZóny TP",     tip:"Tréninkové zóny dle prahového tempa" },
+      { id:"convert", label:"🔄\nPřepočet",    tip:"Převod min/km ↔ km/h ↔ m/s · běžící pás" },
+      { id:"races",   label:"🏆\nZávody",      tip:"Závodní predikce · Riegel · Yasso · počasí" },
+      { id:"zones",   label:"📊\nZóny TP",     tip:"Tréninkové zóny dle tempa nebo Karvonen HR" },
+      { id:"terrain", label:"⛰️\nTerén",       tip:"GAP — tempo s ohledem na převýšení a sklon" },
       { id:"cadence", label:"👟\nKadence",     tip:"Optimální kadence dle tempa a výšky" },
       { id:"shoes",   label:"👞\nVelikost",    tip:"Přepočet velikostí bot EU · UK · US · cm" },
-      { id:"countdown",label:"⏳\nOdpočet",    tip:"Odpočet do závodu, výročí nebo čas od události" },
+      { id:"countdown",label:"⏳\nOdpočet",    tip:"Odpočet do závodu · iCal export · čas od události" },
     ];
 
     function App() {
@@ -2720,6 +3196,7 @@
             {tab==="profil"   && <ProfilTab onApply={handleProfileApply} />}
             {tab==="goal"    && <GoalTab {...goalState} />}
             {tab==="zones"   && <ZonesTab    {...shared}/> }
+            {tab==="terrain" && <TerrainTab  {...shared}/>}
             {tab==="cadence"  && <CadenceTab  {...shared}/>}
             {tab==="shoes"    && <ShoeSizeTab />}
             {tab==="countdown" && <CountdownTab />}
