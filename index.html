@@ -816,20 +816,56 @@
           {mode === "yasso" && (
             <div className="card">
               <div className="card-lbl">// <span>
-                <Tooltip text="Yasso 800s je tréninkový test od trenéra Barta Yassa. 10× 800 m s pauzou (lehkým klusem) ve stejném čase. Když zvládneš 10 opakování po m:ss, čas tvého maratonu bude přibližně h:mm (např. 10× 3:30 → maraton 3:30 h). Heuristika, ne přesný vzorec — ale velmi populární u maratonců.">
+                <Tooltip text="Tréninková jednotka amerického trenéra Barta Yassa: 10× 800 m svižně, 800 m volně klusem mezi tím. Čas opakování v minutách:sekundách se ZÁZRAČNĚ podobá času maratonu v hodinách:minutách. Není to přesná věda, ale pro většinu lidí to vychází ±10 minut.">
                   YASSO 800s — predikce maratonu
                 </Tooltip>
               </span></div>
-              <div style={{fontSize:12,color:'#888',marginBottom:12,lineHeight:1.6}}>
-                Klasický trénink Barta Yassa: <strong style={{color:'#ccc'}}>10× 800 m</strong> s pauzou ve stejném čase. Čas opakování v <em>m:ss</em> ≈ čas maratonu v <em>h:mm</em>.
+
+              {/* Plain-Czech explanation block */}
+              <div style={{padding:'14px 16px',background:'rgba(76,255,0,.04)',border:'1px solid rgba(76,255,0,.15)',borderRadius:10,marginBottom:14}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:15,marginBottom:8,color:'#e8e8e8',display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:18}}>🤔</span> Co je to a jak to funguje?
+                </div>
+                <div style={{fontSize:13,color:'#bbb',lineHeight:1.7}}>
+                  Yasso 800s je <strong style={{color:'#e8e8e8'}}>tréninková jednotka</strong>, kterou vymyslel trenér <strong style={{color:'#e8e8e8'}}>Bart Yasso</strong>. Pomůže ti odhadnout, jestli máš formu na maraton, co plánuješ — aniž bys ho musel zaběhnout celý.
+                </div>
+                <div style={{marginTop:10,fontSize:13,color:'#bbb',lineHeight:1.7}}>
+                  <strong style={{color:'#e8e8e8'}}>Jak se cvičí:</strong> Na atletickém ovále nebo rovince:<br/>
+                  • běh <strong style={{color:'#fff'}}>800 m svižně</strong> (= 2 kola)<br/>
+                  • pak <strong style={{color:'#fff'}}>800 m volný klus</strong> jako pauza<br/>
+                  • <strong style={{color:'#fff'}}>10× zopakovat</strong> (celkem ~ 60–90 min)
+                </div>
+                <div style={{marginTop:10,fontSize:13,color:'#bbb',lineHeight:1.7}}>
+                  <strong style={{color:'#e8e8e8'}}>Trik:</strong> Čas, který opakovaně udržíš na 800 m, ti řekne, jaký uběhneš maraton — jen se prohodí jednotky.
+                </div>
+                <table style={{width:'100%',marginTop:12,fontSize:12,borderCollapse:'collapse'}}>
+                  <thead>
+                    <tr style={{color:'#888'}}>
+                      <td style={{padding:'4px 6px',fontSize:10,letterSpacing:1.5,textTransform:'uppercase',fontWeight:700}}>800 m zvládneš za…</td>
+                      <td style={{padding:'4px 6px',fontSize:10,letterSpacing:1.5,textTransform:'uppercase',fontWeight:700}}>…tvůj maraton bude cca</td>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[['3 min 00 s','3 hod 00 min'],['3 min 30 s','3 hod 30 min'],['4 min 00 s','4 hod 00 min'],['4 min 30 s','4 hod 30 min'],['5 min 00 s','5 hod 00 min']].map(([a,b])=>(
+                      <tr key={a} style={{borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                        <td style={{padding:'7px 6px',color:'var(--accent)',fontWeight:700}}>{a}</td>
+                        <td style={{padding:'7px 6px',color:'#ddd',fontWeight:600}}>{b}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{marginTop:10,fontSize:11,color:'#888',lineHeight:1.6,fontStyle:'italic'}}>
+                  Čísla vlevo jsou <strong style={{color:'#aaa'}}>minuty a sekundy</strong>, vpravo <strong style={{color:'#aaa'}}>hodiny a minuty</strong>. To je celý ten Yassův „trik".
+                </div>
               </div>
+
               <div className="btn-grp" style={{marginBottom:14}}>
                 <button className={`btn${yMode==="fromMaraton"?" on":""}`} onClick={()=>setYMode("fromMaraton")}>Mám cíl maratonu</button>
                 <button className={`btn${yMode==="fromYasso"?" on":""}`} onClick={()=>setYMode("fromYasso")}>Mám čas 800 m</button>
               </div>
               {yMode === "fromMaraton" ? (
                 <>
-                  <div style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:'#666',marginBottom:8,fontWeight:700}}>// CÍLOVÝ ČAS MARATONU</div>
+                  <div style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:'#666',marginBottom:8,fontWeight:700}}>// CHCI MARATON ZA…</div>
                   <div className="big-display">
                     <span className="big-num accent">{p2(yMaraH)}</span><span className="big-unit">H</span>
                     <span className="big-num">{p2(yMaraM)}</span><span className="big-unit">MIN</span>
@@ -839,19 +875,31 @@
                   {(() => {
                     const ySec = yassoFromMarathon(yMaraH*3600 + yMaraM*60);
                     const km800Pace = ySec / 0.8; // sec per km
+                    const ymin = Math.floor(ySec/60), ysec = ySec%60;
                     return (
-                      <div className="rgrid" style={{marginTop:14}}>
-                        <div className="rbox"><div className="rbox-lbl">Cíl 800 m</div><div className="rbox-val g">{toHMS(ySec)}<em>min:s</em></div></div>
-                        <div className="rbox"><div className="rbox-lbl">Tempo</div><div className="rbox-val">{toHMS(km800Pace)}<em>min/km</em></div></div>
-                        <div className="rbox"><div className="rbox-lbl">Trénink</div><div className="rbox-val">10×<em>opakování</em></div></div>
-                        <div className="rbox"><div className="rbox-lbl">Pauza</div><div className="rbox-val">{toHMS(ySec)}<em>klus</em></div></div>
-                      </div>
+                      <>
+                        <div style={{marginTop:14,padding:'14px 16px',background:'rgba(76,255,0,.06)',border:'1px solid rgba(76,255,0,.25)',borderRadius:10,textAlign:'center'}}>
+                          <div style={{fontSize:11,letterSpacing:1.5,color:'#888',marginBottom:6,fontWeight:600}}>MUSÍŠ ZVLÁDNOUT</div>
+                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:900,fontSize:32,color:'var(--accent)',lineHeight:1}}>
+                            10× 800 m za {ymin}:{p2(ysec)}
+                          </div>
+                          <div style={{fontSize:12,color:'#888',marginTop:6}}>
+                            s pauzou (klusem) <strong style={{color:'#ccc'}}>{ymin}:{p2(ysec)}</strong> mezi opakováními
+                          </div>
+                        </div>
+                        <div className="rgrid" style={{marginTop:10}}>
+                          <div className="rbox"><div className="rbox-lbl">Cíl 800 m</div><div className="rbox-val g">{toHMS(ySec)}<em>min:s</em></div></div>
+                          <div className="rbox"><div className="rbox-lbl">Tempo na 800 m</div><div className="rbox-val">{toHMS(km800Pace)}<em>min/km</em></div></div>
+                          <div className="rbox"><div className="rbox-lbl">Počet opakování</div><div className="rbox-val">10×</div></div>
+                          <div className="rbox"><div className="rbox-lbl">Pauza (volný klus)</div><div className="rbox-val">{toHMS(ySec)}</div></div>
+                        </div>
+                      </>
                     );
                   })()}
                 </>
               ) : (
                 <>
-                  <div style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:'#666',marginBottom:8,fontWeight:700}}>// ČAS 800 m</div>
+                  <div style={{fontSize:10,letterSpacing:2,textTransform:'uppercase',color:'#666',marginBottom:8,fontWeight:700}}>// ZVLÁDNU 800 m ZA…</div>
                   <div className="big-display">
                     <span className="big-num accent">{p2(yY)}</span><span className="big-unit">MIN</span>
                     <span className="big-num">{p2(yYS)}</span><span className="big-unit">S</span>
@@ -861,17 +909,32 @@
                   {(() => {
                     const mSec = marathonFromYasso(yY*60 + yYS);
                     const marPace = mSec / 42.195;
+                    const mh = Math.floor(mSec/3600), mm = Math.floor((mSec%3600)/60);
                     return (
-                      <div className="rgrid" style={{marginTop:14}}>
-                        <div className="rbox"><div className="rbox-lbl">Predikce maratonu</div><div className="rbox-val g">{toHMS(mSec)}<em>h:mm</em></div></div>
-                        <div className="rbox"><div className="rbox-lbl">Tempo maratonu</div><div className="rbox-val">{toHMS(marPace)}<em>min/km</em></div></div>
-                      </div>
+                      <>
+                        <div style={{marginTop:14,padding:'14px 16px',background:'rgba(76,255,0,.06)',border:'1px solid rgba(76,255,0,.25)',borderRadius:10,textAlign:'center'}}>
+                          <div style={{fontSize:11,letterSpacing:1.5,color:'#888',marginBottom:6,fontWeight:600}}>PRAVDĚPODOBNÝ MARATON</div>
+                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:900,fontSize:36,color:'var(--accent)',lineHeight:1}}>
+                            {mh}:{p2(mm)}:00
+                          </div>
+                          <div style={{fontSize:12,color:'#888',marginTop:6}}>
+                            tempo cca <strong style={{color:'#ccc'}}>{toHMS(marPace)} min/km</strong>
+                          </div>
+                        </div>
+                        <div className="rgrid" style={{marginTop:10}}>
+                          <div className="rbox"><div className="rbox-lbl">Predikce maratonu</div><div className="rbox-val g">{toHMS(mSec)}<em>h:mm</em></div></div>
+                          <div className="rbox"><div className="rbox-lbl">Tempo maratonu</div><div className="rbox-val">{toHMS(marPace)}<em>min/km</em></div></div>
+                        </div>
+                      </>
                     );
                   })()}
                 </>
               )}
               <div style={{marginTop:14,padding:'10px 12px',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:8,fontSize:11,color:'#888',lineHeight:1.7}}>
-                💡 <strong style={{color:'#ccc'}}>Tip:</strong> Začni 4× 800 m a každý týden přidávej jedno opakování. Cílových 10× zvládneš 2–3 týdny před závodem.
+                💡 <strong style={{color:'#ccc'}}>Tréninkový plán:</strong> Začni 4× 800 m a každý týden přidávej jedno opakování. Cílových <strong style={{color:'#ccc'}}>10× zvládneš 2–3 týdny před závodem</strong> — to je tvůj test, jestli forma sedí.
+              </div>
+              <div style={{marginTop:8,fontSize:10,color:'#555',lineHeight:1.6,fontStyle:'italic',padding:'0 4px'}}>
+                Yasso 800s je <strong>orientační heuristika</strong>, ne fyzikální vzorec. Reálný výsledek závisí i na vytrvalostním základu, počasí a strategii. Pro většinu maratonců vychází ±10 minut.
               </div>
             </div>
           )}
