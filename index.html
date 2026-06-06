@@ -421,13 +421,14 @@
     }
 
     // ─── Grade Adjusted Pace (GAP) ────────────────────────────
-    // Minetti et al. — energy cost of running as function of slope.
-    // Returns multiplier vs. flat (1.0 = flat, >1 harder/slower equivalent).
+    // Minetti et al. (2002) — energy cost of running as function of slope.
+    // Cw(i) polynomial returns J/kg/m; we normalize by Cw(0)=3.6 to get a factor.
     function gapFactor(grade) {
       // grade is rise/run (e.g. 0.05 = 5 % uphill)
-      const g = grade;
-      // Strava-style polynomial approximation of Minetti's data
-      return 15.14 * g*g*g*g - 2.896 * g*g*g + 4.503 * g*g + 0.3001 * g + 1.0;
+      const i = Math.max(-0.45, Math.min(0.45, grade));
+      const Cw = 155.4*Math.pow(i,5) - 30.4*Math.pow(i,4) - 43.3*Math.pow(i,3)
+               + 46.3*Math.pow(i,2) + 19.5*i + 3.6;
+      return Cw / 3.6;
     }
 
     // ─── Yasso 800s ──────────────────────────────────────────
@@ -459,19 +460,20 @@
     }
 
     // ─── Temperature & humidity marathon correction ──────────
-    // Combines temperature impact (Maughan / El Helou et al.) with humidity penalty.
-    // Returns multiplicative slowdown factor (>=1.0). Ideal ~ 10–12 °C / low humidity.
+    // Calibrated against El Helou et al. (2012) marathon performance data:
+    //  ~optimum 10–12 °C, ~+5 % at 20 °C, ~+9 % at 25 °C, ~+16 % at 30 °C.
+    // Returns multiplicative slowdown factor (>=1.0).
     function tempCorrection(tempC, humidityPct) {
       const t = Number(tempC);
       const h = Math.max(0, Math.min(100, Number(humidityPct)));
       // Temperature: parabola with minimum at 11 °C
       const tDelta = t - 11;
       let tempFactor;
-      if (tDelta <= 0) tempFactor = 1 + 0.0010 * tDelta * tDelta; // colder = mild penalty
-      else             tempFactor = 1 + 0.0028 * tDelta * tDelta; // warmer = strong penalty
-      // Humidity: above 60 % adds extra cost (more at higher temps)
+      if (tDelta <= 0) tempFactor = 1 + 0.0004 * tDelta * tDelta; // colder = mild penalty
+      else             tempFactor = 1 + 0.00045 * tDelta * tDelta; // warmer = stronger penalty
+      // Humidity: above 60 % adds extra cost (scales with temperature)
       const humBase = Math.max(0, h - 60) / 100;
-      const humFactor = 1 + humBase * (0.05 + 0.005 * Math.max(0, t - 15));
+      const humFactor = 1 + humBase * (0.03 + 0.003 * Math.max(0, t - 15));
       return tempFactor * humFactor;
     }
 
