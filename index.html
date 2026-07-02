@@ -3090,12 +3090,284 @@
       );
     }
 
+    // ─── TriTab (Triatlon) ────────────────────────────────
+    const TRI_RACES = [
+      { id:"sprint",  label:"Sprint",         swim:0.75,  bike:20,  run:5,       tip:"750 m plavání · 20 km kolo · 5 km běh" },
+      { id:"olympic", label:"Olympijský",     swim:1.5,   bike:40,  run:10,      tip:"1,5 km plavání · 40 km kolo · 10 km běh" },
+      { id:"half",    label:"70.3 (půl-Ironman)", swim:1.9, bike:90, run:21.0975, tip:"1,9 km plavání · 90 km kolo · půlmaraton" },
+      { id:"full",    label:"Ironman",        swim:3.8,   bike:180, run:42.195,  tip:"3,8 km plavání · 180 km kolo · maraton" },
+      { id:"custom",  label:"Vlastní",        swim:1.5,   bike:40,  run:10,      tip:"Nastav si vlastní distance" },
+    ];
+
+    function TriTab() {
+      const [ridx, setRidx] = React.useState(1); // Olympic
+      const [customSwim, setCustomSwim] = React.useState(1.5);
+      const [customBike, setCustomBike] = React.useState(40);
+      const [customRun,  setCustomRun]  = React.useState(10);
+
+      // Paces stored as seconds
+      // Swim: sec per 100 m; Bike: km/h; Run: sec per km
+      const [swimSec, setSwimSec] = React.useState(120); // 2:00 / 100 m
+      const [bikeKph, setBikeKph] = React.useState(30);
+      const [runSec,  setRunSec]  = React.useState(300); // 5:00 / km
+
+      // Transitions (minutes)
+      const [t1, setT1] = React.useState(2);
+      const [t2, setT2] = React.useState(2);
+
+      // Mode: derive total from paces, or derive paces from goal
+      const [mode, setMode] = React.useState("paces");
+      const [goalH, setGoalH] = React.useState(2);
+      const [goalM, setGoalM] = React.useState(45);
+
+      const cur = TRI_RACES[ridx];
+      const isCustom = cur.id === "custom";
+      const swimKm = isCustom ? customSwim : cur.swim;
+      const bikeKm = isCustom ? customBike : cur.bike;
+      const runKm  = isCustom ? customRun  : cur.run;
+
+      // Compute segment times from paces
+      const swimTime = swimKm * 10 * swimSec; // sec: km * (1000/100) * sec/100m
+      const bikeTime = bikeKph > 0 ? (bikeKm / bikeKph) * 3600 : 0;
+      const runTime  = runKm * runSec;
+      const totalSec = swimTime + t1*60 + bikeTime + t2*60 + runTime;
+
+      const swimPaceLbl = (s) => `${Math.floor(s/60)}:${p2(s%60)} / 100 m`;
+
+      // Goal-time mode: split total by typical race proportions (excl. transitions)
+      // These are median finisher splits (age-group data from Ironman/ITU).
+      const SPLITS_PROP = {
+        sprint:  { swim:0.16, bike:0.51, run:0.33 },
+        olympic: { swim:0.15, bike:0.52, run:0.33 },
+        half:    { swim:0.10, bike:0.53, run:0.37 },
+        full:    { swim:0.10, bike:0.53, run:0.37 },
+        custom:  { swim:0.15, bike:0.52, run:0.33 },
+      };
+      const goalTotal = goalH*3600 + goalM*60;
+      const propKey = cur.id;
+      const p = SPLITS_PROP[propKey];
+      const moveSec = Math.max(0, goalTotal - (t1+t2)*60);
+      const gSwimTime = moveSec * p.swim;
+      const gBikeTime = moveSec * p.bike;
+      const gRunTime  = moveSec * p.run;
+      const gSwimPace = swimKm > 0 ? gSwimTime / (swimKm*10) : 0; // sec/100m
+      const gBikeKph  = gBikeTime > 0 ? bikeKm / (gBikeTime/3600) : 0;
+      const gRunPace  = runKm > 0 ? gRunTime / runKm : 0; // sec/km
+
+      return (
+        <div>
+          <div className="pg-h">TRIATLON</div>
+          <div className="pg-s">Plavání · kolo · běh — všechny standardní distance</div>
+
+          {/* Introduction block */}
+          <div className="card" style={{borderColor:"rgba(76,255,0,.15)",marginBottom:14}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:16,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>🏊🚴🏃</span>
+              <Tooltip text="Triatlon má tři úseky (plavání → kolo → běh) a dvě výměny T1 (voda→kolo) a T2 (kolo→běh). Standardní vzdálenosti: Sprint · Olympijský · 70.3 (půl-Ironman) · Ironman. Výsledný čas = součet všech pěti segmentů.">
+                Co je triatlon?
+              </Tooltip>
+            </div>
+            <div style={{fontSize:13,color:"#666",lineHeight:1.7}}>
+              Kombinace tří sportů v jednom závodě: <strong style={{color:"#4fc3f7"}}>plavání</strong> → <strong style={{color:"#ffca28"}}>kolo</strong> → <strong style={{color:"#4cff00"}}>běh</strong>, mezi nimi výměny <strong style={{color:"#ccc"}}>T1 a T2</strong>.
+            </div>
+          </div>
+
+          {/* Distance selector */}
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:10,letterSpacing:2.5,textTransform:"uppercase",color:"#888",marginBottom:10,fontWeight:600}}>// DISTANCE</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {TRI_RACES.map((d,i) => (
+                <button key={d.id} className={`btn${ridx===i?" on":""}`}
+                  style={{padding:"8px 14px",fontSize:11}} onClick={()=>setRidx(i)}>{d.label}</button>
+              ))}
+            </div>
+            <div style={{marginTop:10,fontSize:11,color:"#888",fontStyle:"italic",padding:"0 4px"}}>
+              {cur.tip}
+            </div>
+          </div>
+
+          {isCustom && (
+            <div className="card" style={{marginBottom:14}}>
+              <div className="card-lbl">// <span>VLASTNÍ DISTANCE</span></div>
+              <Slider label="🏊 PLAVÁNÍ" value={customSwim} min={0.1} max={10}  step={0.1} unit="km" onChange={v=>setCustomSwim(parseFloat(parseFloat(v).toFixed(1)))} />
+              <Slider label="🚴 KOLO"    value={customBike} min={1}   max={300} step={1}   unit="km" onChange={setCustomBike} />
+              <Slider label="🏃 BĚH"     value={customRun}  min={0.5} max={100} step={0.5} unit="km" onChange={v=>setCustomRun(parseFloat(parseFloat(v).toFixed(1)))} />
+            </div>
+          )}
+
+          <div className="btn-grp">
+            <button className={`btn${mode==="paces"?" on":""}`} onClick={()=>setMode("paces")}>Dle tempa</button>
+            <button className={`btn${mode==="goal"?" on":""}`}  onClick={()=>setMode("goal")}>Dle cílového času</button>
+          </div>
+
+          {mode === "paces" && (
+            <>
+              {/* Swim card */}
+              <div className="card" style={{marginTop:14,borderColor:"rgba(79,195,247,.25)"}}>
+                <div className="card-lbl">// <span>
+                  <Tooltip text="Standardní jednotka je min:sec na 100 metrů. Začátečník ~2:30, hobby plavec ~2:00, pokročilý ~1:40, elite ~1:20.">
+                    🏊 PLAVÁNÍ — tempo
+                  </Tooltip>
+                </span></div>
+                <div className="big-display">
+                  <BigEdit value={Math.floor(swimSec/60)} min={0} max={5}  accent onChange={v=>setSwimSec(v*60 + (swimSec%60))} />
+                  <span className="big-unit">MIN</span>
+                  <BigEdit value={swimSec%60} min={0} max={59} onChange={v=>setSwimSec(Math.floor(swimSec/60)*60 + v)} />
+                  <span className="big-unit">S / 100 M</span>
+                </div>
+                <Slider label="TEMPO / 100 m" value={swimSec} min={60} max={240} step={1} unit="s"
+                  onChange={setSwimSec} />
+                <div className="rgrid" style={{marginTop:6}}>
+                  <div className="rbox"><div className="rbox-lbl">Vzdálenost</div><div className="rbox-val">{(swimKm*1000).toFixed(0)}<em>m</em></div></div>
+                  <div className="rbox"><div className="rbox-lbl">Čas plavání</div><div className="rbox-val g">{toHMS(swimTime)}</div></div>
+                </div>
+              </div>
+
+              {/* Bike card */}
+              <div className="card" style={{marginTop:14,borderColor:"rgba(255,202,40,.25)"}}>
+                <div className="card-lbl">// <span>
+                  <Tooltip text="Průměrná rychlost na kole závisí na profilu, výbavě a formě. Hobby ~25 km/h, pokročilý ~32 km/h, elite ~40 km/h. Ironman elite jede přes 180 km průměrem 40+ km/h.">
+                    🚴 KOLO — rychlost
+                  </Tooltip>
+                </span></div>
+                <div className="big-display">
+                  <BigEdit value={bikeKph} min={5} max={60} decimals={1} accent onChange={v=>setBikeKph(parseFloat(v.toFixed(1)))} />
+                  <span className="big-unit">KM/H</span>
+                </div>
+                <Slider label="RYCHLOST" value={bikeKph} min={10} max={55} step={0.5} unit="km/h"
+                  onChange={v=>setBikeKph(parseFloat(parseFloat(v).toFixed(1)))} />
+                <div className="rgrid" style={{marginTop:6}}>
+                  <div className="rbox"><div className="rbox-lbl">Vzdálenost</div><div className="rbox-val">{bikeKm}<em>km</em></div></div>
+                  <div className="rbox"><div className="rbox-lbl">Čas na kole</div><div className="rbox-val g">{toHMS(bikeTime)}</div></div>
+                </div>
+              </div>
+
+              {/* Run card */}
+              <div className="card" style={{marginTop:14,borderColor:"rgba(76,255,0,.25)"}}>
+                <div className="card-lbl">// <span>
+                  <Tooltip text="Běžecké tempo v triatlonu je vždy pomalejší než sólo běh, protože nohy jsou z kola. Připočti si +15–30 s/km oproti čistě běžecké formě.">
+                    🏃 BĚH — tempo
+                  </Tooltip>
+                </span></div>
+                <div className="big-display">
+                  <BigEdit value={Math.floor(runSec/60)} min={2} max={12} accent onChange={v=>setRunSec(v*60 + (runSec%60))} />
+                  <span className="big-unit">MIN</span>
+                  <BigEdit value={runSec%60} min={0} max={59} onChange={v=>setRunSec(Math.floor(runSec/60)*60 + v)} />
+                  <span className="big-unit">S / KM</span>
+                </div>
+                <Slider label="TEMPO / km" value={runSec} min={180} max={720} step={5} unit="s"
+                  onChange={setRunSec} />
+                <div className="rgrid" style={{marginTop:6}}>
+                  <div className="rbox"><div className="rbox-lbl">Vzdálenost</div><div className="rbox-val">{runKm}<em>km</em></div></div>
+                  <div className="rbox"><div className="rbox-lbl">Čas běhu</div><div className="rbox-val g">{toHMS(runTime)}</div></div>
+                </div>
+              </div>
+
+              {/* Transitions */}
+              <div className="card" style={{marginTop:14}}>
+                <div className="card-lbl">// <span>
+                  <Tooltip text="T1 = přechod z vody na kolo (utíráš se, obouváš, nasazuješ helmu). T2 = přechod z kola na běh (odkládáš helmu, měníš boty). Elite ~30–60 s, hobby závodníci 2–4 min. Na Ironmanu se dá strávit 5–10 minut.">
+                    T1 · T2 — výměny
+                  </Tooltip>
+                </span></div>
+                <Slider label="T1 (voda → kolo)"  value={t1} min={0} max={15} step={0.5} unit="min" onChange={v=>setT1(parseFloat(parseFloat(v).toFixed(1)))} />
+                <Slider label="T2 (kolo → běh)"   value={t2} min={0} max={15} step={0.5} unit="min" onChange={v=>setT2(parseFloat(parseFloat(v).toFixed(1)))} />
+              </div>
+
+              {/* Big total */}
+              <div style={{marginTop:14,padding:"18px 16px",background:"rgba(76,255,0,.08)",border:"1px solid rgba(76,255,0,.3)",borderRadius:12,textAlign:"center"}}>
+                <div style={{fontSize:11,letterSpacing:2,color:"#888",marginBottom:6,fontWeight:600}}>CELKOVÝ ČAS</div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:900,fontSize:48,color:"var(--accent)",lineHeight:1}}>
+                  {toHMS(totalSec)}
+                </div>
+                <div style={{fontSize:12,color:"#888",marginTop:8}}>
+                  {cur.label} · {swimKm} km + {bikeKm} km + {runKm} km
+                </div>
+              </div>
+
+              {/* Splits summary */}
+              <div className="card" style={{marginTop:14}}>
+                <div className="card-lbl">// <span>ROZLOŽENÍ ČASU</span></div>
+                <table className="ztable">
+                  <tbody>
+                    {[
+                      { name:"🏊 Plavání", time:swimTime, pace:swimPaceLbl(swimSec), col:"#4fc3f7" },
+                      { name:"🔁 T1",      time:t1*60,    pace:"—",                   col:"#888"    },
+                      { name:"🚴 Kolo",    time:bikeTime, pace:`${bikeKph.toFixed(1)} km/h`, col:"#ffca28" },
+                      { name:"🔁 T2",      time:t2*60,    pace:"—",                   col:"#888"    },
+                      { name:"🏃 Běh",     time:runTime,  pace:`${toHMS(runSec)} / km`, col:"#4cff00" },
+                    ].map((r,i)=>(
+                      <tr className="zrow" key={i}>
+                        <td style={{padding:"8px 6px",fontWeight:600,color:r.col}}>{r.name}</td>
+                        <td style={{padding:"8px 6px",color:"#888",fontSize:11}}>{r.pace}</td>
+                        <td style={{padding:"8px 6px",fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:16,color:"#e8e8e8",textAlign:"right"}}>{toHMS(r.time)}</td>
+                        <td style={{padding:"8px 6px",color:"#666",fontSize:10,textAlign:"right",width:60}}>{totalSec>0 ? Math.round(100*r.time/totalSec) : 0}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {mode === "goal" && (
+            <>
+              <div className="card" style={{marginTop:14}}>
+                <div className="card-lbl">// <span>
+                  <Tooltip text="Zadej cílový čas závodu — kalkulačka rozloží celkový čas podle typického poměru mezi disciplínami (medián finišerů) a řekne ti, jaká tempa potřebuješ v každém úseku. Konkrétní rozložení si můžeš doladit sám v módu 'Dle tempa'.">
+                    CÍLOVÝ ČAS
+                  </Tooltip>
+                </span></div>
+                <div className="big-display">
+                  <span className="big-num accent">{p2(goalH)}</span><span className="big-unit">H</span>
+                  <span className="big-num">{p2(goalM)}</span><span className="big-unit">MIN</span>
+                </div>
+                <Slider label="HODINY" value={goalH} min={0} max={17} unit="h"   onChange={setGoalH} />
+                <Slider label="MINUTY" value={goalM} min={0} max={59} unit="min" onChange={setGoalM} />
+                <Slider label="T1 (voda → kolo)"  value={t1} min={0} max={15} step={0.5} unit="min" onChange={v=>setT1(parseFloat(parseFloat(v).toFixed(1)))} />
+                <Slider label="T2 (kolo → běh)"   value={t2} min={0} max={15} step={0.5} unit="min" onChange={v=>setT2(parseFloat(parseFloat(v).toFixed(1)))} />
+              </div>
+
+              <div style={{marginTop:14,padding:"14px 16px",background:"rgba(76,255,0,.06)",border:"1px solid rgba(76,255,0,.25)",borderRadius:12}}>
+                <div style={{fontSize:11,letterSpacing:2,color:"#888",marginBottom:10,fontWeight:600,textAlign:"center"}}>MUSÍŠ ZVLÁDNOUT PRŮMĚRNĚ</div>
+                <table className="ztable">
+                  <tbody>
+                    {[
+                      { name:"🏊 Plavání", km:swimKm, time:gSwimTime, pace:swimPaceLbl(Math.round(gSwimPace)), col:"#4fc3f7" },
+                      { name:"🚴 Kolo",    km:bikeKm, time:gBikeTime, pace:`${gBikeKph.toFixed(1)} km/h`,       col:"#ffca28" },
+                      { name:"🏃 Běh",     km:runKm,  time:gRunTime,  pace:`${toHMS(Math.round(gRunPace))} / km`, col:"#4cff00" },
+                    ].map((r,i)=>(
+                      <tr className="zrow" key={i}>
+                        <td style={{padding:"10px 6px",fontWeight:700,color:r.col,fontSize:14}}>{r.name}</td>
+                        <td style={{padding:"10px 6px"}}>
+                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:900,fontSize:20,color:"#e8e8e8"}}>{r.pace}</div>
+                          <div style={{fontSize:10,color:"#666",marginTop:2}}>{r.km} km · {toHMS(r.time)}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{marginTop:10,fontSize:10,color:"#666",lineHeight:1.6,fontStyle:"italic"}}>
+                  Rozložení podle mediánu finišerů. Skutečné poměry se mohou lišit dle terénu a tvých silných/slabých stránek.
+                </div>
+              </div>
+            </>
+          )}
+
+          <div style={{marginTop:12,fontSize:11,color:"#555",lineHeight:1.7,padding:"0 4px"}}>
+            💡 <strong style={{color:"#aaa"}}>Tip:</strong> Běh v triatlonu je o 15–30 s/km pomalejší než čistě běžecký, protože nohy jsou z kola. Na Ironmanu čekej ještě větší rozdíl.
+          </div>
+        </div>
+      );
+    }
+
     const TABS = [
       { id:"profil",  label:"👤\nProfil",      tip:"Tvůj profil · OR · tempa · boty · vše na jednom místě" },
       { id:"goal",    label:"🎯\nCílový čas",  tip:"Zadej cíl a vzdálenost → zjisti tempo" },
       { id:"splits",  label:"⏱\nMezičasy",     tip:"Mezičasy na krátké úseky (100m–1míle)" },
       { id:"convert", label:"🔄\nPřepočet",    tip:"Převod min/km ↔ km/h ↔ m/s · běžící pás" },
       { id:"races",   label:"🏆\nZávody",      tip:"Závodní predikce · Riegel · Yasso · počasí" },
+      { id:"tri",     label:"🏊\nTriatlon",    tip:"Sprint · Olympijský · 70.3 · Ironman · vlastní" },
       { id:"zones",   label:"📊\nZóny TP",     tip:"Tréninkové zóny dle tempa nebo Karvonen HR" },
       { id:"terrain", label:"⛰️\nTerén",       tip:"GAP — tempo s ohledem na převýšení a sklon" },
       { id:"cadence", label:"👟\nKadence",     tip:"Optimální kadence dle tempa a výšky" },
@@ -3260,6 +3532,7 @@
             {tab==="races"   && <RacesTab    {...shared}/>}
             {tab==="profil"   && <ProfilTab onApply={handleProfileApply} />}
             {tab==="goal"    && <GoalTab {...goalState} />}
+            {tab==="tri"     && <TriTab />}
             {tab==="zones"   && <ZonesTab    {...shared}/> }
             {tab==="terrain" && <TerrainTab  {...shared}/>}
             {tab==="cadence"  && <CadenceTab  {...shared}/>}
