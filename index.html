@@ -3420,6 +3420,88 @@
       );
     }
 
+    /* ─────────── LICENČNÍ ZÁMEK — Pro verze (99 Kč) ───────────
+       Free: goal, convert, profil.  Pro: vše ostatní.
+       Odemyká se kódem, který kupující dostane v mailu po zaplacení na davidvas.cz.
+       Kód = deterministicky z e‑mailu (stejný algoritmus i na serveru davidvas.cz).
+       Pozn.: appka je veřejná (GitHub Pages) → jde o měkký zámek: zastaví běžné lidi,
+       ne experta, který si přečte kód. Pro produkt za 99 Kč to je adekvátní. */
+    const PRO_TABS = ["splits","races","tri","zones","terrain","cadence","shoes","countdown"];
+    const CALC_BUY_URL = "https://www.davidvas.cz/sluzby/bezecka-kalkulacka#objednat";
+    const CALC_LICENSE_KEY = "tymdejvid_calc_license";
+    const CALC_SECRET = "TDkalk-2026-9Fx7pQ2v";
+    function calcLicenseCode(email){
+      const s = String(email||"").trim().toLowerCase();
+      const str = CALC_SECRET + "|" + s;
+      let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+      for (let i=0;i<str.length;i++){ const ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
+      h1 = Math.imul(h1^(h1>>>16),2246822507) ^ Math.imul(h2^(h2>>>13),3266489909);
+      h2 = Math.imul(h2^(h2>>>16),2246822507) ^ Math.imul(h1^(h1>>>13),3266489909);
+      const num = 4294967296*(2097151&h2)+(h1>>>0);
+      const b36 = num.toString(36).toUpperCase().padStart(10,"0").slice(-10);
+      return b36.slice(0,5)+"-"+b36.slice(5,10);
+    }
+    function checkCalcLicense(email, code){
+      if(!email||!code) return false;
+      const norm = String(code).toUpperCase().replace(/[^A-Z0-9-]/g,"");
+      return norm === calcLicenseCode(email);
+    }
+    function loadCalcLicense(){
+      try{ const raw = localStorage.getItem(CALC_LICENSE_KEY); if(!raw) return false; const o=JSON.parse(raw); return checkCalcLicense(o.email,o.code); }catch(e){ return false; }
+    }
+    function saveCalcLicense(email, code){
+      try{ localStorage.setItem(CALC_LICENSE_KEY, JSON.stringify({email:String(email).trim().toLowerCase(), code:String(code).toUpperCase().replace(/[^A-Z0-9-]/g,"")})); }catch(e){}
+    }
+    function LockScreen({ tabId, onUnlock }){
+      const meta = TABS.find(t => t.id===tabId) || {};
+      const name = String(meta.label||"").split("\n").slice(1).join("") || "Tato funkce";
+      const [showCode, setShowCode] = useState(false);
+      const [email, setEmail] = useState("");
+      const [code, setCode] = useState("");
+      const [err, setErr] = useState("");
+      function submit(){
+        if(checkCalcLicense(email, code)){ saveCalcLicense(email, code); onUnlock(); }
+        else { setErr("Kód nesedí k tomuhle e‑mailu. Zadej stejný e‑mail jako při koupi a kód z potvrzovacího mailu."); }
+      }
+      const inp = { width:"100%", boxSizing:"border-box", padding:"12px 14px", margin:"6px 0", borderRadius:10, border:"1px solid rgba(76,255,0,0.35)", background:"rgba(255,255,255,0.04)", color:"#fff", fontSize:16 };
+      return (
+        <div style={{maxWidth:430, margin:"0 auto", textAlign:"center", padding:"36px 20px"}}>
+          <div style={{fontSize:54,lineHeight:1,marginBottom:10}}>🔒</div>
+          <h2 style={{margin:"0 0 8px",fontSize:22}}>{name} je v plné verzi</h2>
+          <p style={{color:"rgba(255,255,255,0.75)",lineHeight:1.6,fontSize:15,margin:"0 0 20px"}}>
+            V plné verzi odemkneš <b style={{color:"#4cff00"}}>triatlon, tréninkové zóny, závodní predikce, GAP</b> a spoustu dalšího. Jednou <b>99&nbsp;Kč</b>, navždy — i všechny budoucí updaty.
+          </p>
+          <a href={CALC_BUY_URL} target="_blank" rel="noopener"
+             style={{display:"block",background:"#4cff00",color:"#04210a",fontWeight:800,padding:"14px 18px",borderRadius:12,textDecoration:"none",fontSize:16,marginBottom:12}}>
+            Odemknout za 99 Kč →
+          </a>
+          {!showCode && (
+            <button onClick={()=>setShowCode(true)}
+              style={{background:"none",border:"none",color:"rgba(255,255,255,0.7)",textDecoration:"underline",cursor:"pointer",fontSize:14}}>
+              Už mám kód
+            </button>
+          )}
+          {showCode && (
+            <div style={{marginTop:14,textAlign:"left",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(76,255,0,0.2)",borderRadius:12,padding:"16px"}}>
+              <div style={{fontWeight:700,marginBottom:6,textAlign:"center"}}>Zadej odemykací kód</div>
+              <input type="email" placeholder="E‑mail (stejný jako při koupi)" value={email}
+                onChange={e=>{setEmail(e.target.value);setErr("");}} style={inp} autoComplete="email" />
+              <input type="text" placeholder="Kód (např. AB12C‑D34E5)" value={code}
+                onChange={e=>{setCode(e.target.value);setErr("");}} style={inp} />
+              {err && <div style={{color:"#ff6b6b",fontSize:13,margin:"6px 2px",lineHeight:1.4}}>{err}</div>}
+              <button onClick={submit}
+                style={{width:"100%",background:"#4cff00",color:"#04210a",fontWeight:800,padding:"12px",borderRadius:10,border:"none",cursor:"pointer",fontSize:16,marginTop:8}}>
+                Odemknout ✓
+              </button>
+              <div style={{color:"rgba(255,255,255,0.5)",fontSize:12,marginTop:10,textAlign:"center",lineHeight:1.5}}>
+                Kód ti přišel v e‑mailu po zaplacení. Nemáš ho? Napiš na trener@davidvas.cz.
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     const TABS = [
       { id:"profil",  label:"👤\nProfil",      tip:"Tvůj profil · OR · tempa · boty · vše na jednom místě" },
       { id:"goal",    label:"🎯\nCílový čas",  tip:"Zadej cíl a vzdálenost → zjisti tempo" },
@@ -3437,6 +3519,7 @@
     function App() {
       const [tab, setTab] = useState("goal");
       const [showMore, setShowMore] = useState(false);
+      const [unlocked, setUnlocked] = useState(loadCalcLicense);
       const [pm, setPm]   = useState(3);
       const [ps, setPs]   = useState(20);
       const [dark, setDark] = useState(true);
@@ -3563,7 +3646,7 @@
                     <button key={t.id} className={"more-item"+(tab===t.id?" on":"")}
                       onClick={()=>{ setTab(t.id); setShowMore(false); }}>
                       <span style={{fontSize:28,lineHeight:1}}>{icon}</span>
-                      <span>{rest.join("")}</span>
+                      <span>{rest.join("")}{PRO_TABS.includes(t.id) && !unlocked ? " 🔒" : ""}</span>
                     </button>
                   );
                 })}
@@ -3576,7 +3659,7 @@
               return (
                 <button key={t.id} className={"tab"+(tab===t.id?" on":"")} onClick={()=>{ setTab(t.id); setShowMore(false); }}>
                   <span style={{fontSize:26,lineHeight:1}}>{icon}</span>
-                  <span style={{fontSize:9,letterSpacing:1,textTransform:"uppercase",fontWeight:800}}>{rest.join("")}</span>
+                  <span style={{fontSize:9,letterSpacing:1,textTransform:"uppercase",fontWeight:800}}>{rest.join("")}{PRO_TABS.includes(t.id) && !unlocked ? " 🔒" : ""}</span>
                 </button>
               );
             })}
@@ -3586,17 +3669,23 @@
             </button>
           </nav>
           <main className="pg">
-            {tab==="convert" && <ConvertTab  {...shared}/>}
-            {tab==="splits"  && <SplitsTab   {...shared}/>}
-            {tab==="races"   && <RacesTab    {...shared}/>}
-            {tab==="profil"   && <ProfilTab onApply={handleProfileApply} />}
-            {tab==="goal"    && <GoalTab {...goalState} />}
-            {tab==="tri"     && <TriTab />}
-            {tab==="zones"   && <ZonesTab    {...shared}/> }
-            {tab==="terrain" && <TerrainTab  {...shared}/>}
-            {tab==="cadence"  && <CadenceTab  {...shared}/>}
-            {tab==="shoes"    && <ShoeSizeTab />}
-            {tab==="countdown" && <CountdownTab />}
+            {PRO_TABS.includes(tab) && !unlocked ? (
+              <LockScreen tabId={tab} onUnlock={()=>setUnlocked(true)} />
+            ) : (
+              <React.Fragment>
+                {tab==="convert" && <ConvertTab  {...shared}/>}
+                {tab==="splits"  && <SplitsTab   {...shared}/>}
+                {tab==="races"   && <RacesTab    {...shared}/>}
+                {tab==="profil"   && <ProfilTab onApply={handleProfileApply} />}
+                {tab==="goal"    && <GoalTab {...goalState} />}
+                {tab==="tri"     && <TriTab />}
+                {tab==="zones"   && <ZonesTab    {...shared}/> }
+                {tab==="terrain" && <TerrainTab  {...shared}/>}
+                {tab==="cadence"  && <CadenceTab  {...shared}/>}
+                {tab==="shoes"    && <ShoeSizeTab />}
+                {tab==="countdown" && <CountdownTab />}
+              </React.Fragment>
+            )}
           </main>
         </div>
       );
