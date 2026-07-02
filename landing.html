@@ -134,6 +134,68 @@
       pointer-events: none;
     }
 
+    /* ── UPDATE BAR (persistent, top) ── */
+    .update-bar {
+      position: fixed; top: 64px; left: 0; right: 0; z-index: 90;
+      background: linear-gradient(90deg, rgba(76,255,0,.14), rgba(76,255,0,.06));
+      border-bottom: 1px solid rgba(76,255,0,.25);
+      display: flex; align-items: center; justify-content: center; gap: 14px;
+      padding: 10px 20px; font-family: 'Barlow Condensed',sans-serif; font-weight: 700;
+      font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--green);
+    }
+    .update-bar a { color: var(--black); background: var(--green); border-radius: 6px; padding: 4px 10px; text-decoration: none; font-weight: 800; }
+    .update-bar-close { background: transparent; border: none; color: rgba(76,255,0,.5); font-size: 16px; cursor: pointer; padding: 0 6px; }
+    body.has-update-bar nav { top: 40px; }
+    body.has-update-bar .hero { padding-top: 140px; }
+
+    /* ── NEWS SECTION (highlighted, right after hero) ── */
+    .news-wrap {
+      background:
+        radial-gradient(ellipse 50% 60% at 90% 30%, rgba(76,255,0,.06) 0%, transparent 55%),
+        rgba(76,255,0,.02);
+      border-top: 1px solid rgba(76,255,0,.15);
+      border-bottom: 1px solid rgba(76,255,0,.15);
+      padding: 80px 40px;
+    }
+    .news-inner { max-width: 1100px; margin: 0 auto; }
+    .news-tag {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(76,255,0,.12); border: 1px solid rgba(76,255,0,.35);
+      color: var(--green); border-radius: 100px; padding: 6px 14px;
+      font-family: 'Barlow Condensed',sans-serif; font-weight: 800;
+      font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .news-tag span { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    .news-h {
+      font-family: 'Barlow Condensed',sans-serif; font-weight: 900;
+      font-size: clamp(36px, 5vw, 56px); line-height: .95; margin-bottom: 14px;
+    }
+    .news-h em { font-style: normal; color: var(--green); }
+    .news-sub { font-size: 16px; color: #888; max-width: 620px; line-height: 1.6; margin-bottom: 44px; }
+    .news-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;
+    }
+    .news-item {
+      background: var(--card); border: 1px solid rgba(76,255,0,.15); border-radius: 14px;
+      padding: 22px 20px; position: relative; transition: border-color .2s, transform .2s;
+    }
+    .news-item:hover { border-color: rgba(76,255,0,.45); transform: translateY(-2px); }
+    .news-item-badge {
+      position: absolute; top: -10px; right: 14px;
+      background: var(--green); color: var(--black);
+      font-family: 'Barlow Condensed',sans-serif; font-weight: 900;
+      font-size: 9px; letter-spacing: 1.5px; padding: 3px 8px; border-radius: 100px;
+    }
+    .news-item-icon { font-size: 26px; margin-bottom: 12px; display: block; }
+    .news-item-title {
+      font-family: 'Barlow Condensed',sans-serif; font-weight: 800;
+      font-size: 17px; margin-bottom: 6px; color: var(--text);
+    }
+    .news-item-desc { font-size: 13px; color: #777; line-height: 1.55; }
+    .news-cta { margin-top: 40px; display: flex; gap: 12px; flex-wrap: wrap; }
+
     /* ── FEATURES ── */
     .section { padding: 100px 40px; max-width: 1100px; margin: 0 auto; }
     .section-tag { font-family: 'Barlow Condensed',sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--green); margin-bottom: 12px; }
@@ -215,7 +277,13 @@
     }
   </style>
 </head>
-<body>
+<body class="has-update-bar">
+
+<div class="update-bar" id="updateBar">
+  <span>✨ Léto 2026 · Nové funkce v kalkulačce</span>
+  <a href="#novinky">Podívat se</a>
+  <button class="update-bar-close" onclick="document.body.classList.remove('has-update-bar');document.getElementById('updateBar').style.display='none'" aria-label="Zavřít">✕</button>
+</div>
 
 <nav>
   <div class="nav-logo">
@@ -229,7 +297,7 @@
     <div>
       <div class="hero-tag"><span></span> Připraveno pro trenéry</div>
       <h1>Běžecká<br>kalkulačka<br>pro <em>#TýmDejvid</em></h1>
-      <p class="hero-sub">Profesionální nástroj pro výpočet tempa, závodních časů, tréninkových zón a mezičasů. Navrženo s láskou k běhu.</p>
+      <p class="hero-sub">Profesionální nástroj pro výpočet tempa, závodních časů, tréninkových zón a mezičasů. Nově i pro <strong style="color:#4cff00">triatlonisty</strong> — všechny distance od Sprintu po Ironmana.</p>
       <div class="hero-btns">
         <a href="https://david-vas.github.io/Bezecka-kalkulacka/" target="_blank" class="btn-primary">🏃 Otevřít appku</a>
         <a href="#features" class="btn-secondary">Co umí?</a>
@@ -271,11 +339,110 @@
   </div>
 </section>
 
+<div id="novinky" class="news-wrap">
+<div class="news-inner">
+  <div class="news-tag"><span></span> Aktualizace · Léto 2026</div>
+  <h2 class="news-h">Co je <em>nového</em><br>v kalkulačce</h2>
+  <p class="news-sub">Rozšířili jsme appku o funkce, které si přáli trenéři i běžci a triatlonisté. Vše je součástí základní verze — bez příplatku, aktualizuje se automaticky. Stačí <strong style="color:#aaa">otevřít appku a udělat tvrdý refresh</strong> (Ctrl+Shift+R nebo v PWA restartovat).</p>
+
+  <div class="news-grid">
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">🏊🚴🏃</span>
+      <div class="news-item-title">Triatlon — všechny distance</div>
+      <div class="news-item-desc">Sprint, Olympijský, 70.3, Ironman i vlastní. Přepočítá tempa všech tří disciplín, T1/T2 přechody a celkový čas. Umí i obráceně — z cíle spočítá potřebná tempa.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">🔁</span>
+      <div class="news-item-title">Depo (přechodové zóny)</div>
+      <div class="news-item-desc">Přednastavené úrovně od Elite po Ironman, tipy na rychlé výměny a rozpis, co všechno v T1 a T2 stihnout.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">⛰️</span>
+      <div class="news-item-title">Terén (GAP)</div>
+      <div class="news-item-desc">Grade Adjusted Pace — kolik tě reálně zpomalí kopec. Zadej distanci a převýšení, dostaneš skutečné tempo i čas.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">❤️</span>
+      <div class="news-item-title">Karvonenovy zóny</div>
+      <div class="news-item-desc">Tréninkové zóny podle tepové rezervy (HRmax − HRrest). Přesnější než procento HRmax.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">🏆</span>
+      <div class="news-item-title">Yasso 800s</div>
+      <div class="news-item-desc">Klasický test pro maratonce. Zadej cíl, dostaneš přesný trénink 10× 800 m. Nebo naopak z časů opakování odhad maratonu.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">🌡️</span>
+      <div class="news-item-title">Korekce na počasí</div>
+      <div class="news-item-desc">Kolik tě v den závodu zpomalí teplota a vlhkost. Kalibrováno podle studií finišerů maratonů.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">🏃‍♂️</span>
+      <div class="news-item-title">Běžící pás ↔ silnice</div>
+      <div class="news-item-desc">Převod mezi tempem na pásu (různé sklony) a ekvivalentním silničním tempem.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">📅</span>
+      <div class="news-item-title">Odpočet + kalendář</div>
+      <div class="news-item-desc">Odpočet do závodů, výročí, jakékoliv události. Nově export do Google/Apple kalendáře jedním kliknutím.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">🔗</span>
+      <div class="news-item-title">Sdílení svěřenců</div>
+      <div class="news-item-desc">Trenéři: vytvoř profil běžci, pošli mu odkaz — otevře si appku se svými tempy předvyplněnými.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">📴</span>
+      <div class="news-item-title">Offline režim</div>
+      <div class="news-item-desc">Funguje i na startu, kde nechytneš signál. Po prvním načtení běží zcela offline.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">💡</span>
+      <div class="news-item-title">Nápověda „?"</div>
+      <div class="news-item-desc">U klíčových pojmů (LT2, GAP, Yasso, Karvonen, Riegel) najdeš zelené kolečko s vysvětlením.</div>
+    </div>
+
+    <div class="news-item">
+      <span class="news-item-badge">Nové</span>
+      <span class="news-item-icon">⛰️</span>
+      <div class="news-item-title">Přesnější vzorce</div>
+      <div class="news-item-desc">GAP podle Minettiho polynomu, teplota podle El Helou studií. Čísla teď sedí s tím, co ti ukáže Garmin nebo hodinky Suunto.</div>
+    </div>
+  </div>
+
+  <div class="news-cta">
+    <a href="https://david-vas.github.io/Bezecka-kalkulacka/" target="_blank" class="btn-primary">🏃 Otevřít novou verzi</a>
+    <a href="#features" class="btn-secondary">Všechny funkce</a>
+  </div>
+</div>
+</div>
+
 <div id="features" style="border-top:1px solid var(--border)">
 <div class="section">
   <div class="section-tag">Funkce</div>
   <h2 class="section-h">Vše co běžec<br>potřebuje</h2>
-  <p class="section-sub">Pět záložek, stovky výpočtů. Funguje offline, na telefonu i počítači.</p>
+  <p class="section-sub">Jedenáct záložek, stovky výpočtů. Funguje offline, na telefonu i počítači.</p>
 
   <div class="features-grid">
     <div class="feat">
@@ -304,9 +471,34 @@
       <div class="feat-desc">10 dynamických zón dle tvého prahového tempa. Fixní zóny #TýmDejvid pro rychlou orientaci.</div>
     </div>
     <div class="feat">
+      <div class="feat-icon">🏊🚴🏃</div>
+      <div class="feat-title">Triatlon</div>
+      <div class="feat-desc">Sprint, Olympijský, 70.3, Ironman i vlastní distance. Přepočet temp plavání, kola a běhu včetně depa (T1/T2).</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">⛰️</div>
+      <div class="feat-title">Terén (GAP)</div>
+      <div class="feat-desc">Grade Adjusted Pace — spočítá reálné tempo s ohledem na převýšení. Použij pro horské trasy a intervaly do kopce.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">❤️</div>
+      <div class="feat-title">Karvonen HR zóny</div>
+      <div class="feat-desc">Tréninkové zóny podle tepové rezervy (HRmax − HRrest). Přesnější než procento HRmax.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🏆</div>
+      <div class="feat-title">Yasso 800s + počasí</div>
+      <div class="feat-desc">Klasický maratonský test a korekce cílového času na teplotu a vlhkost. Kalibrováno podle studií.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">⏳</div>
+      <div class="feat-title">Odpočet + kalendář</div>
+      <div class="feat-desc">Odpočet do každého závodu, možnost přidat akci jedním klikem do Google/Apple kalendáře.</div>
+    </div>
+    <div class="feat">
       <div class="feat-icon">📱</div>
-      <div class="feat-title">Instalace na telefon</div>
-      <div class="feat-desc">Funguje jako PWA — přidej na plochu přes Safari a používej jako normální appku. Bez App Store.</div>
+      <div class="feat-title">Instalace + offline</div>
+      <div class="feat-desc">Funguje jako PWA — přidej na plochu přes Safari a používej jako appku. Po prvním načtení jede zcela offline.</div>
     </div>
   </div>
 </div>
