@@ -10,6 +10,26 @@
   <meta name="theme-color" content="#0d0d0d">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon.png">
+  <!-- 🌗 VZHLED SE NASAZUJE HNED, PRVNÍ VĚCÍ NA STRÁNCE (David 24. 9. 2026:
+       „ta kalkulačka vždy nějak zvláštně problikne").
+       Vzhled dosud nastavovala až appka — jenže ta se rozjede až po stažení Reactu
+       a Babelu (ten navíc překládá celý soubor v prohlížeči). Do té doby byla stránka
+       černá podle CSS, takže ve světlé appce naskočila černá a teprve pak zbělela.
+       Tenhle skript běží PŘED vším ostatním a jen přepne třídu na <html>; pořadí
+       priorit je stejné jako v appce dole (?theme= od hostitele → uložená volba →
+       nastavení zařízení). Když se cokoli pokazí, zůstane tmavá jako dřív. -->
+  <script>
+    (function () {
+      try {
+        var q = new URLSearchParams(location.search).get('theme');
+        var pref = (q === 'light' || q === 'dark') ? q : (localStorage.getItem('tymdejvid_calc_theme') || 'auto');
+        var dark = pref === 'dark' || (pref !== 'light' && !(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches));
+        document.documentElement.classList.toggle('light', !dark);
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', dark ? '#0d0d0d' : '#f2f2f2');
+      } catch (e) { /* vzhled nikdy nesmí nic rozbít */ }
+    })();
+  </script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -50,6 +70,10 @@
        `color-scheme` je to, čím se řídí barva posuvníku; bez něj zůstane tmavý i na bílé. */
     html { color-scheme: dark; }
     html.light { background: #f2f2f2; color-scheme: light; }
+    /* Třídu `light` dostane <html> hned v <head>, ale <body> a `.app` až z appky —
+       tedy po Reactu a Babelu. Bez tohohle řádku by do té doby svítila černá plocha
+       (to bylo to „zvláštní probliknutí"). Zbytek barev doplní `body.light` níž. */
+    html.light body, html.light .app { background: #f2f2f2; color: #111; }
     body.light { background: #f2f2f2; color: #111; }
     body.light .app { background: #f2f2f2; background-image: radial-gradient(ellipse 70% 50% at 5% 5%, rgba(76,255,0,.08) 0%, transparent 55%), radial-gradient(ellipse 50% 70% at 95% 95%, rgba(76,255,0,.05) 0%, transparent 55%); }
     body.light .hdr { background: #fff; border-bottom-color: #ddd; }
@@ -3633,6 +3657,8 @@
     }
     function calcApplyTheme(dark){
       document.body.classList.toggle("light", !dark);
+      // `html` už třídu většinou má z inline skriptu v <head> — tady se jen srovná
+      // (přepnutí přepínačem, zpráva z appky).
       document.documentElement.classList.toggle("light", !dark);   // viz „🖤 Pozadí" v CSS
       // barva lišty prohlížeče na telefonu — jinak nad světlou appkou visí černý pruh
       try { const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", dark ? "#0d0d0d" : "#f2f2f2"); } catch(e){}

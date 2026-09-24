@@ -1,7 +1,11 @@
 // TýmDejvid · Běžecká kalkulačka — Service Worker
 // Strategy: network-first for HTML (so updates are seen), cache-first for static assets, app shell fallback when offline.
 
-const VERSION = 'tymdejvid-v1';
+// 🚨 PŘI KAŽDÉ ZMĚNĚ index.html TOHLE ČÍSLO ZVYŠ.
+// `activate` maže jen cache s JINÝM klíčem — dokud se klíč nemění, stará kopie
+// uložených souborů tu leží dál a lidem se servíruje stará kalkulačka.
+// (David 24. 9. 2026: oprava byla na webu, ale on ji pořád neviděl.)
+const VERSION = 'tymdejvid-v2';
 const APP_SHELL = [
   './',
   './index.html',
