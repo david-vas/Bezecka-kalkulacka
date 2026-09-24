@@ -43,6 +43,13 @@
     .cd-form-input { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12) !important; color: inherit; }
     .cd-icon-btn { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1) !important; color: inherit; }
     html, body { background: #0d0d0d; color: #e8e8e8; font-family: 'Barlow', sans-serif; transition: background .2s, color .2s; }
+    /* 🖤 Pozadí musí mít i <html>, ne jen <body> (David 24. 9. 2026: „ten proužek černý").
+       Světlý režim přepisoval jen <body>, takže po okrajích — a hlavně na posuvníku,
+       který prohlížeč kreslí podle KOŘENE stránky — prosvítala černá. V rámu v appce
+       to vypadalo jako černý rám kolem kalkulačky.
+       `color-scheme` je to, čím se řídí barva posuvníku; bez něj zůstane tmavý i na bílé. */
+    html { color-scheme: dark; }
+    html.light { background: #f2f2f2; color-scheme: light; }
     body.light { background: #f2f2f2; color: #111; }
     body.light .app { background: #f2f2f2; background-image: radial-gradient(ellipse 70% 50% at 5% 5%, rgba(76,255,0,.08) 0%, transparent 55%), radial-gradient(ellipse 50% 70% at 95% 95%, rgba(76,255,0,.05) 0%, transparent 55%); }
     body.light .hdr { background: #fff; border-bottom-color: #ddd; }
@@ -2101,6 +2108,28 @@
     function loadProfile() {
       try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { return {}; }
     }
+    /* 🔗 CO POSLALA APPKA (David 24. 9. 2026: „pak to mít napojený na profil").
+       Tempa z adresy (?p5k=&p10k=&phalf=&pmar=&name=) se do 24. 9. použila JEN na výpočet —
+       okno 👤 zůstalo prázdné a vypadalo to, že appka nic neposlala. Teď se pamatují zvlášť
+       a doplní se do profilu, ale jen tam, kde si člověk nic svého nenapsal. Přepsat vlastní
+       hodnotu smí jedině ON sám tlačítkem „↺ Z appky" — automat mu do ní nesahá. */
+    const APP_LS_KEY = "tymdejvid_app_profile";
+    const APP_FIELDS = ["name", "p5k", "p10k", "phalf", "pmar"];
+    function loadAppProfile() {
+      try { return JSON.parse(localStorage.getItem(APP_LS_KEY)) || {}; } catch(e) { return {}; }
+    }
+    function saveAppProfile(p) {
+      try { localStorage.setItem(APP_LS_KEY, JSON.stringify(p || {})); } catch(e) {}
+    }
+    /** Doplní do profilu jen PRÁZDNÁ pole — ruční hodnota vyhrává. */
+    function seedProfileFromApp(fromApp) {
+      const cur = loadProfile(); let zmena = false;
+      APP_FIELDS.forEach(k => {
+        if (fromApp && fromApp[k] && !String(cur[k] || "").trim()) { cur[k] = fromApp[k]; zmena = true; }
+      });
+      if (zmena) saveProfile(cur);
+      return cur;
+    }
     function saveProfile(p) {
       try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch(e) {}
     }
@@ -2113,6 +2142,14 @@
       const [p10k,  setP10k]  = React.useState(saved.p10k  || "");
       const [phalf, setPhalf] = React.useState(saved.phalf || "");
       const [pmar,  setPmar]  = React.useState(saved.pmar  || "");
+      // 🔗 Co poslala appka — viz „CO POSLALA APPKA" u localStorage helperů
+      const fromApp = loadAppProfile();
+      const setters = { name:setName, p5k:setP5k, p10k:setP10k, phalf:setPhalf, pmar:setPmar };
+      const hodnoty  = { name, p5k, p10k, phalf, pmar };
+      const maApp   = APP_FIELDS.some(k => fromApp[k]);
+      // liší se to, co je v políčkách, od toho, co poslala appka?
+      const jinak   = APP_FIELDS.some(k => fromApp[k] && String(fromApp[k]) !== String(hodnoty[k] || ""));
+      function vzitZApky() { APP_FIELDS.forEach(k => { if (fromApp[k]) setters[k](fromApp[k]); }); }
 
       function handleApply() {
         const profile = { ...saved, name, p5k, p10k, phalf, pmar };
@@ -2133,6 +2170,20 @@
             <button className="modal-close" onClick={onClose}>✕</button>
             <h2>👤 Rychlá úprava profilu</h2>
             <div className="sub">Pro více možností přejdi na záložku 👤 Profil</div>
+            {maApp && (
+              <div style={{background:"rgba(76,255,0,0.08)",border:"1px solid rgba(76,255,0,0.3)",borderRadius:10,
+                           padding:"10px 12px",margin:"0 0 12px",fontSize:12,lineHeight:1.6}}>
+                🔗 <b>Tempa máš z appky</b> — spočítala je z tvých osobních rekordů.
+                Přepsat si je tu můžeš, tvoje rekordy to nezmění.
+                {jinak && (
+                  <button type="button" onClick={vzitZApky}
+                    style={{display:"block",marginTop:8,background:"transparent",border:"1px solid rgba(76,255,0,0.45)",
+                            borderRadius:8,padding:"6px 10px",color:"inherit",font:"inherit",fontSize:12,cursor:"pointer"}}>
+                    ↺ Načíst znovu z appky
+                  </button>
+                )}
+              </div>
+            )}
             {fields.map((f,i) => (
               <div key={i} className="profile-field">
                 <label>{f.label}</label>
@@ -2140,7 +2191,10 @@
               </div>
             ))}
             <button className="profile-apply" onClick={handleApply}>💾 Uložit a použít</button>
-            <div style={{marginTop:12,fontSize:11,color:"#444",textAlign:"center",lineHeight:1.6}}>Data se ukládají jen v tvém prohlížeči.</div>
+            <div style={{marginTop:12,fontSize:11,color:"#444",textAlign:"center",lineHeight:1.6}}>
+              Data se ukládají jen v tvém prohlížeči.
+              {maApp ? " Rekordy se opravují v appce v Závody → Osobní rekordy." : ""}
+            </div>
           </div>
         </div>
       );
@@ -3551,7 +3605,12 @@
       const p = calcThemePref();
       return p === "dark" || (p === "auto" && !!(themeMq && themeMq.matches));
     }
-    function calcApplyTheme(dark){ document.body.classList.toggle("light", !dark); }
+    function calcApplyTheme(dark){
+      document.body.classList.toggle("light", !dark);
+      document.documentElement.classList.toggle("light", !dark);   // viz „🖤 Pozadí" v CSS
+      // barva lišty prohlížeče na telefonu — jinak nad světlou appkou visí černý pruh
+      try { const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", dark ? "#0d0d0d" : "#f2f2f2"); } catch(e){}
+    }
     calcApplyTheme(calcThemeIsDark());   // hned při načtení, ať to neproblikne
     function saveCalcLicense(email, code){
       try{ localStorage.setItem(CALC_LICENSE_KEY, JSON.stringify({email:String(email).trim().toLowerCase(), code:String(code).toUpperCase().replace(/[^A-Z0-9-]/g,"")})); }catch(e){}
@@ -3675,6 +3734,8 @@
           if (urlName)  tempProfile.name  = urlName;
           if (Object.keys(tempProfile).length > 0) {
             try { localStorage.setItem('tymdejvid_url_athlete', JSON.stringify(tempProfile)); } catch(e){}
+            saveAppProfile(tempProfile);      // ať okno 👤 ví, co appka poslala
+            seedProfileFromApp(tempProfile);  // doplní jen to, co v profilu chybí
           }
           if (urlTab) setTab(urlTab);
           return; // URL params override everything else
