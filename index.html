@@ -273,6 +273,18 @@
       /* přepínač vzhledu má jinak `margin-left:auto` a odskočil by sám na třetí řádek */
       .theme-btn { margin-left: 0; }
     }
+
+    /* 🪟 V RÁMU UVNITŘ APPKY (?embed=) — David 24. 9. 2026: „toto se tam v tom
+       muj-ucet moc nehodí." Vlastní logo, název „BĚŽECKÁ KALKULAČKA · davidvas.cz"
+       a přepínač svěřenců tam jsou navíc: člověk UŽ JE v Davidově appce, je
+       přihlášený jako on sám a svěřence nespravuje. Zůstane tenký proužek
+       s 👤 profilem (tam se zadávají osobní tempa) a 🔍 velikostí.
+       Stojí ZA mobilním blokem výš, aby ho i na úzku přebilo. */
+    body.embed .hdr { height:auto; min-height:0; padding:6px 10px; gap:6px; flex-wrap:nowrap; justify-content:flex-end; }
+    body.embed .hdr > img,
+    body.embed .hdr > div:not(.hdr-btns),
+    body.embed .ath-switcher { display:none; }
+    body.embed .hdr-btns { width:auto; margin-left:auto; flex-wrap:nowrap; justify-content:flex-end; }
     /* share overlay */
     .share-preview { background:#181818;border:1px solid #222;border-radius:12px;padding:20px;margin:16px 0;text-align:center; }
     .share-actions { display:flex;gap:10px;flex-wrap:wrap; }
@@ -3513,6 +3525,7 @@
       try{ document.documentElement.style.setProperty("--calc-zoom", String(pct / 100)); }catch(e){}
     }
     calcApplyZoom(calcZoomLoad());   // hned při načtení, ať to neproblikne
+    if (calcIsEmbed()) { try{ document.body.classList.add("embed"); }catch(e){} }
 
     /* ── Vzhled (tmavý / světlý) ────────────────────────────────────────────────
        Do 24. 9. 2026 se vzhled NEPAMATOVAL: appka startovala vždy tmavá a přepínač
