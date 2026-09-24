@@ -3446,8 +3446,28 @@
       const norm = String(code).toUpperCase().replace(/[^A-Z0-9-]/g,"");
       return norm === calcLicenseCode(email);
     }
+    /* Odemčení z ADRESY — ?lmail=<e-mail>&lic=<kód>.
+       Používá to appka na davidvas.cz/muj-ucet: kdo má kalkulačku zaplacenou, otevře si ji
+       rovnou v Tréninku a nic neopisuje. Kód se ověřuje úplně stejně jako ručně zadaný
+       (checkCalcLicense) — tudy tedy nejde odemknout nic, co by nešlo odemknout ručně.
+       Proč v adrese a ne jen z úložiště: Safari na iPhonu odděluje úložiště stránky
+       načtené v rámu z cizí domény, takže uložené odemčení tam nemusí přežít. */
+    function calcLicenseFromUrl(){
+      try{
+        const q = new URLSearchParams(window.location.search);
+        const email = q.get("lmail") || "", code = q.get("lic") || "";
+        if(email && code && checkCalcLicense(email, code)){ saveCalcLicense(email, code); return true; }
+      }catch(e){}
+      return false;
+    }
     function loadCalcLicense(){
+      if(calcLicenseFromUrl()) return true;
       try{ const raw = localStorage.getItem(CALC_LICENSE_KEY); if(!raw) return false; const o=JSON.parse(raw); return checkCalcLicense(o.email,o.code); }catch(e){ return false; }
+    }
+    /* ?embed=hub — kalkulačka běží v rámu uvnitř appky davidvas.cz/muj-ucet.
+       Schová tlačítka, která dávají smysl jen na samostatné stránce (Sdílet, Embed). */
+    function calcIsEmbed(){
+      try{ return !!new URLSearchParams(window.location.search).get("embed"); }catch(e){ return false; }
     }
     function saveCalcLicense(email, code){
       try{ localStorage.setItem(CALC_LICENSE_KEY, JSON.stringify({email:String(email).trim().toLowerCase(), code:String(code).toUpperCase().replace(/[^A-Z0-9-]/g,"")})); }catch(e){}
@@ -3630,8 +3650,8 @@
             <div className="hdr-btns">
               <AthletesSwitcher key={athletesVer} activeAthId={activeAthId} onOpenManage={()=>setShowAthletes(true)} onSelect={applyAthleteOrProfile} />
               <button className="hdr-btn" onClick={()=>setShowProfile(true)} title="Můj profil">👤</button>
-              <button className="hdr-btn" onClick={()=>setShowShare(true)} title="Sdílet">📤</button>
-              <button className="hdr-btn" onClick={()=>setShowEmbed(true)} title="Embed">🔗</button>
+              {!calcIsEmbed() && <button className="hdr-btn" onClick={()=>setShowShare(true)} title="Sdílet">📤</button>}
+              {!calcIsEmbed() && <button className="hdr-btn" onClick={()=>setShowEmbed(true)} title="Embed">🔗</button>}
               <button className="theme-btn" onClick={toggleTheme}>{dark ? "☀️" : "🌙"}</button>
             </div>
           </header>
