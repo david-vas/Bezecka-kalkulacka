@@ -3469,6 +3469,33 @@
     function calcIsEmbed(){
       try{ return !!new URLSearchParams(window.location.search).get("embed"); }catch(e){ return false; }
     }
+
+    /* ── Vzhled (tmavý / světlý) ────────────────────────────────────────────────
+       Do 24. 9. 2026 se vzhled NEPAMATOVAL: appka startovala vždy tmavá a přepínač
+       jen přehodil třídu na <body>. Kdo chtěl světlou, musel klikat po každém otevření
+       — a nastavení telefonu (noční režim) se neptala vůbec.
+
+       Tři stavy, stejné jako v appce davidvas.cz/muj-ucet, ať to David nemusí mít
+       v hlavě dvakrát:   🌗 podle zařízení (výchozí) → ☀️ vždy světlý → 🌙 vždy tmavý.
+       'auto' se neukládá hodnotou, ale smazáním klíče — nový návštěvník a ten, kdo se
+       vrátil na „podle zařízení", tak mají stejný stav. */
+    const CALC_THEME_KEY = "tymdejvid_calc_theme";
+    const themeMq = (() => { try{ return window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null; }catch(e){ return null; } })();
+    /* ?theme=light|dark posílá hostitelská appka, když kalkulačka běží v jejím rámu.
+       Má přednost a NEUKLÁDÁ se — je to jen „tady se zrovna kouká na světlé". */
+    function calcThemeFromHost(){
+      try{ const v = new URLSearchParams(window.location.search).get("theme"); return (v === "light" || v === "dark") ? v : null; }catch(e){ return null; }
+    }
+    function calcThemePref(){
+      try{ const v = localStorage.getItem(CALC_THEME_KEY); return (v === "light" || v === "dark") ? v : "auto"; }catch(e){ return "auto"; }
+    }
+    function calcThemeIsDark(){
+      const host = calcThemeFromHost(); if(host) return host === "dark";
+      const p = calcThemePref();
+      return p === "dark" || (p === "auto" && !!(themeMq && themeMq.matches));
+    }
+    function calcApplyTheme(dark){ document.body.classList.toggle("light", !dark); }
+    calcApplyTheme(calcThemeIsDark());   // hned při načtení, ať to neproblikne
     function saveCalcLicense(email, code){
       try{ localStorage.setItem(CALC_LICENSE_KEY, JSON.stringify({email:String(email).trim().toLowerCase(), code:String(code).toUpperCase().replace(/[^A-Z0-9-]/g,"")})); }catch(e){}
     }
@@ -3542,7 +3569,9 @@
       const [unlocked, setUnlocked] = useState(loadCalcLicense);
       const [pm, setPm]   = useState(3);
       const [ps, setPs]   = useState(20);
-      const [dark, setDark] = useState(true);
+      const [themePref, setThemePref] = useState(calcThemePref);
+      const [dark, setDark] = useState(calcThemeIsDark);
+      const hostTheme = calcThemeFromHost();
       const [urlAthleteName, setUrlAthleteName] = useState(() => {
         try { return new URLSearchParams(window.location.search).get('name') || null; } catch(e){ return null; }
       });
@@ -3592,6 +3621,9 @@
           if (urlTab) setTab(urlTab);
           return; // URL params override everything else
         }
+        // ?tab= musí fungovat i samo o sobě — do 24. 9. 2026 ho appka přečetla jen tehdy,
+        // když v adrese bylo ZÁROVEŇ nějaké tempo, takže odkaz „otevři rovnou Triatlon" nefungoval.
+        if (urlTab) setTab(urlTab);
         // 2. Try active athlete, then own profile
         const athId = loadActiveAthId();
         if (athId) {
@@ -3625,12 +3657,35 @@
         if (p.pmar) { const parsed = parsePaceStr(p.pmar); if (parsed) { setPm(parsed.m); setPs(parsed.s); } }
       }
 
+      // 🌗 podle zařízení → ☀️ světlý → 🌙 tmavý → zpátky
       const toggleTheme = () => {
-        setDark(d => {
-          document.body.classList.toggle('light', d);
-          return !d;
-        });
+        const next = { auto: "light", light: "dark", dark: "auto" }[calcThemePref()];
+        try{ if(next === "auto") localStorage.removeItem(CALC_THEME_KEY); else localStorage.setItem(CALC_THEME_KEY, next); }catch(e){}
+        setThemePref(next);
+        const d = calcThemeIsDark();
+        setDark(d); calcApplyTheme(d);
       };
+      // Systém přehodí vzhled za běhu (noční režim v telefonu) — v „podle zařízení" se srovnat hned
+      React.useEffect(() => {
+        if(!themeMq) return;
+        const onSys = () => { if(!calcThemeFromHost() && calcThemePref() === "auto"){ const d = calcThemeIsDark(); setDark(d); calcApplyTheme(d); } };
+        if(themeMq.addEventListener) themeMq.addEventListener("change", onSys); else if(themeMq.addListener) themeMq.addListener(onSys);
+        return () => { if(themeMq.removeEventListener) themeMq.removeEventListener("change", onSys); else if(themeMq.removeListener) themeMq.removeListener(onSys); };
+      }, []);
+      /* Hostitelská appka (davidvas.cz/muj-ucet) přehodila vzhled, zatímco tu někdo počítá.
+         Přijde zpráva do rámu — měnit adresu rámu by kalkulačku načetlo znovu a smazalo rozpočítané.
+         Zpráva umí JEDINOU věc: přehodit barvy. Bereme ji jen od appky, která nás vložila. */
+      React.useEffect(() => {
+        const OK = ["https://davidvas.cz", "https://www.davidvas.cz"];
+        const onMsg = (e) => {
+          if(!(OK.includes(e.origin) || /^http:\/\/localhost:\d+$/.test(e.origin))) return;
+          const d = e.data;
+          if(!d || d.type !== "tdCalcTheme" || typeof d.dark !== "boolean") return;
+          setDark(d.dark); calcApplyTheme(d.dark);
+        };
+        window.addEventListener("message", onMsg);
+        return () => window.removeEventListener("message", onMsg);
+      }, []);
       const shared = { pm, ps, setPm, setPs };
       const goalState = { gH, setGH, gM, setGM, gS, setGS, didx, setDidx, customKm, setCustomKm, splitEvery, setSplitEvery, splitType, setSplitType, splitPct, setSplitPct };
       const savedProfile = loadProfile();
@@ -3652,7 +3707,14 @@
               <button className="hdr-btn" onClick={()=>setShowProfile(true)} title="Můj profil">👤</button>
               {!calcIsEmbed() && <button className="hdr-btn" onClick={()=>setShowShare(true)} title="Sdílet">📤</button>}
               {!calcIsEmbed() && <button className="hdr-btn" onClick={()=>setShowEmbed(true)} title="Embed">🔗</button>}
-              <button className="theme-btn" onClick={toggleTheme}>{dark ? "☀️" : "🌙"}</button>
+              {!hostTheme && (
+                <button className="theme-btn" onClick={toggleTheme}
+                  title={themePref === "auto" ? `Vzhled: podle zařízení (teď ${dark ? "tmavý" : "světlý"}) — klikni pro světlý`
+                       : themePref === "light" ? "Vzhled: vždy světlý — klikni pro tmavý"
+                       : "Vzhled: vždy tmavý — klikni zpět na nastavení zařízení"}>
+                  {themePref === "auto" ? "🌗" : themePref === "light" ? "☀️" : "🌙"}
+                </button>
+              )}
             </div>
           </header>
           {showMore && <div className="more-menu-overlay" onClick={()=>setShowMore(false)} />}
