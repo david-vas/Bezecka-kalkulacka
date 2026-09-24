@@ -1631,6 +1631,8 @@
           return p ? { pm: p.m, ps: p.s } : { pm: fallbackM, ps: fallbackS };
         }
         return [
+          { id:"1k",       label:"1 km",       icon:"⚡", ...pp(src.p1k,   2, 55) },
+          { id:"3k",       label:"3 km",       icon:"🔥", ...pp(src.p3k,   3, 12) },
           { id:"5k",       label:"5 km",       icon:"💨", ...pp(src.p5k,   3, 30) },
           { id:"10k",      label:"10 km",      icon:"🏃", ...pp(src.p10k,  3, 15) },
           { id:"half",     label:"Půlmaraton", icon:"🥈", ...pp(src.phalf, 3,  5) },
@@ -1891,6 +1893,17 @@
       if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
       return { m: parts[0], s: parts[1] };
     }
+    /* 🏅 „OR 5 km" člověk čte jako ČAS (18:30), ne jako tempo (3:42/km) — proto se
+       u každého pole ukazuje obojí (David 24. 9. 2026: „mít tam i závodní rekordy").
+       Je to Davidovo obecné pravidlo z appky: kde je čas a vzdálenost, ukaž i tempo. */
+    function paceToRaceTime(paceStr, km) {
+      const p = parsePaceStr(paceStr);
+      if (!p || !(km > 0)) return "";
+      const sec = Math.round((p.m * 60 + p.s) * km);
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+      const dv = n => String(n).padStart(2, "0");
+      return h ? (h + ":" + dv(m) + ":" + dv(x)) : (m + ":" + dv(x));
+    }
     function makeid() { return Math.random().toString(36).slice(2,9); }
 
     const ATH_EMOJIS = ["🏃","🏃‍♀️","👟","⚡","🎯","🏅","🥇","🥈","🥉","🌟","💪","🔥","🌄","🦅","🐢","🦁","🐆","🏔️","🌊","❄️","🍀","👑"];
@@ -2114,7 +2127,7 @@
        a doplní se do profilu, ale jen tam, kde si člověk nic svého nenapsal. Přepsat vlastní
        hodnotu smí jedině ON sám tlačítkem „↺ Z appky" — automat mu do ní nesahá. */
     const APP_LS_KEY = "tymdejvid_app_profile";
-    const APP_FIELDS = ["name", "p5k", "p10k", "phalf", "pmar"];
+    const APP_FIELDS = ["name", "p1k", "p3k", "p5k", "p10k", "phalf", "pmar"];
     function loadAppProfile() {
       try { return JSON.parse(localStorage.getItem(APP_LS_KEY)) || {}; } catch(e) { return {}; }
     }
@@ -2138,31 +2151,35 @@
     function ProfileModal({ onClose, onApply }) {
       const saved = loadProfile();
       const [name, setName]   = React.useState(saved.name  || "");
+      const [p1k,   setP1k]   = React.useState(saved.p1k   || "");
+      const [p3k,   setP3k]   = React.useState(saved.p3k   || "");
       const [p5k,   setP5k]   = React.useState(saved.p5k   || "");
       const [p10k,  setP10k]  = React.useState(saved.p10k  || "");
       const [phalf, setPhalf] = React.useState(saved.phalf || "");
       const [pmar,  setPmar]  = React.useState(saved.pmar  || "");
       // 🔗 Co poslala appka — viz „CO POSLALA APPKA" u localStorage helperů
       const fromApp = loadAppProfile();
-      const setters = { name:setName, p5k:setP5k, p10k:setP10k, phalf:setPhalf, pmar:setPmar };
-      const hodnoty  = { name, p5k, p10k, phalf, pmar };
+      const setters = { name:setName, p1k:setP1k, p3k:setP3k, p5k:setP5k, p10k:setP10k, phalf:setPhalf, pmar:setPmar };
+      const hodnoty  = { name, p1k, p3k, p5k, p10k, phalf, pmar };
       const maApp   = APP_FIELDS.some(k => fromApp[k]);
       // liší se to, co je v políčkách, od toho, co poslala appka?
       const jinak   = APP_FIELDS.some(k => fromApp[k] && String(fromApp[k]) !== String(hodnoty[k] || ""));
       function vzitZApky() { APP_FIELDS.forEach(k => { if (fromApp[k]) setters[k](fromApp[k]); }); }
 
       function handleApply() {
-        const profile = { ...saved, name, p5k, p10k, phalf, pmar };
+        const profile = { ...saved, name, p1k, p3k, p5k, p10k, phalf, pmar };
         saveProfile(profile);
         onApply(profile);
         onClose();
       }
       const fields = [
         { label:"Jméno / přezdívka", val:name, set:setName, placeholder:"David Vašíček", isText:true },
-        { label:"💨 OR 5 km (min:ss)", val:p5k, set:setP5k, placeholder:"3:30" },
-        { label:"🏃 OR 10 km (min:ss)", val:p10k, set:setP10k, placeholder:"3:15" },
-        { label:"🥈 OR půlmaraton (min:ss)", val:phalf, set:setPhalf, placeholder:"3:05" },
-        { label:"🏅 OR maraton (min:ss)", val:pmar, set:setPmar, placeholder:"3:18" },
+        { label:"⚡ OR 1 km (min:ss)", val:p1k, set:setP1k, placeholder:"2:55", km:1 },
+        { label:"🔥 OR 3 km (min:ss)", val:p3k, set:setP3k, placeholder:"3:12", km:3 },
+        { label:"💨 OR 5 km (min:ss)", val:p5k, set:setP5k, placeholder:"3:30", km:5 },
+        { label:"🏃 OR 10 km (min:ss)", val:p10k, set:setP10k, placeholder:"3:15", km:10 },
+        { label:"🥈 OR půlmaraton (min:ss)", val:phalf, set:setPhalf, placeholder:"3:05", km:21.0975 },
+        { label:"🏅 OR maraton (min:ss)", val:pmar, set:setPmar, placeholder:"3:18", km:42.195 },
       ];
       return (
         <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -2186,7 +2203,12 @@
             )}
             {fields.map((f,i) => (
               <div key={i} className="profile-field">
-                <label>{f.label}</label>
+                <label>
+                  {f.label}
+                  {f.km && paceToRaceTime(f.val, f.km) && (
+                    <span style={{float:"right",opacity:.7,fontWeight:400}}>= {paceToRaceTime(f.val, f.km)}</span>
+                  )}
+                </label>
                 <input type="text" value={f.val} placeholder={f.placeholder} onChange={e=>f.set(e.target.value)} />
               </div>
             ))}
@@ -2221,6 +2243,8 @@
       const [name,      setName]      = React.useState(initP.name      || '');
       const [gender,    setGender]    = React.useState(initP.gender    || 'men');
       const [birthDate, setBirthDate] = React.useState(initP.birthDate || '');
+      const [p1k,       setP1k]       = React.useState(initP.p1k       || '');
+      const [p3k,       setP3k]       = React.useState(initP.p3k       || '');
       const [p5k,       setP5k]       = React.useState(initP.p5k       || '');
       const [p10k,      setP10k]      = React.useState(initP.p10k      || '');
       const [phalf,     setPhalf]     = React.useState(initP.phalf     || '');
@@ -2291,7 +2315,7 @@
 
       // ─── profile save ───
       function handleSave() {
-        const profile = { name, gender, birthDate, p5k, p10k, phalf, pmar, threshold, longRun, easy, footCm, terrain, note };
+        const profile = { name, gender, birthDate, p1k, p3k, p5k, p10k, phalf, pmar, threshold, longRun, easy, footCm, terrain, note };
         saveProfile(profile);
         if (birthDate) {
           const existing = events;
@@ -2315,6 +2339,8 @@
       const recShoe   = shoeTable.find(r => r.cm >= needed) || shoeTable[shoeTable.length - 1];
 
       const paceRaces = [
+        { label:'1 km',       val:p1k,   km:1,       icon:'⚡', set:setP1k,   ph:'2:55' },
+        { label:'3 km',       val:p3k,   km:3,       icon:'🔥', set:setP3k,   ph:'3:12' },
         { label:'5 km',       val:p5k,   km:5,       icon:'💨', set:setP5k,   ph:'3:30' },
         { label:'10 km',      val:p10k,  km:10,      icon:'🏃', set:setP10k,  ph:'3:15' },
         { label:'Půlmaraton', val:phalf, km:21.0975, icon:'🥈', set:setPhalf, ph:'3:05' },
@@ -3718,11 +3744,15 @@
         const urlPhalf = urlParams.get('phalf');
         const urlP10k  = urlParams.get('p10k');
         const urlP5k   = urlParams.get('p5k');
+        const urlP3k   = urlParams.get('p3k');
+        const urlP1k   = urlParams.get('p1k');
         const urlName  = urlParams.get('name');
         const urlTab   = urlParams.get('tab');
         // Pick best available pace from URL: maraton > půlmaraton > 10k > 5k
+        // Výchozí tempo se bere z delší trati (1 km a 3 km jsou na to moc rychlé),
+        // ale do profilu se uloží všechno, co appka pošle.
         const urlBestPace = urlPmar || urlPhalf || urlP10k || urlP5k;
-        if (urlBestPace) {
+        if (urlBestPace || urlP3k || urlP1k) {
           const p = parsePaceStr(urlBestPace);
           if (p) { setPm(p.m); setPs(p.s); }
           // Store URL params as a temporary "athlete" in profile so PctTab presets work
@@ -3731,6 +3761,8 @@
           if (urlPhalf) tempProfile.phalf = urlPhalf;
           if (urlP10k)  tempProfile.p10k  = urlP10k;
           if (urlP5k)   tempProfile.p5k   = urlP5k;
+          if (urlP3k)   tempProfile.p3k   = urlP3k;
+          if (urlP1k)   tempProfile.p1k   = urlP1k;
           if (urlName)  tempProfile.name  = urlName;
           if (Object.keys(tempProfile).length > 0) {
             try { localStorage.setItem('tymdejvid_url_athlete', JSON.stringify(tempProfile)); } catch(e){}
